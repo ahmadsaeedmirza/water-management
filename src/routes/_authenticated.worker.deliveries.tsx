@@ -1,16 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Minus, Plus, CreditCard, Banknote, Globe, Clock, Truck, ChevronDown } from "lucide-react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/auth";
-import { WorkerShell, TopBar } from "@/components/worker-shell";
-import { formatRs } from "@/lib/format";
-import { toast } from "sonner";
-
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Minus, Plus, CreditCard, Banknote, Globe, Clock, Truck, ChevronDown, Search } from "lucide-react";
+import {
+  Minus,
+  Plus,
+  CreditCard,
+  Banknote,
+  Globe,
+  Clock,
+  Truck,
+  ChevronDown,
+  Search,
+} from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -33,7 +33,9 @@ function DeliveriesPage() {
   const qc = useQueryClient();
   const search = Route.useSearch();
 
-  const [customerType, setCustomerType] = useState<"walkin" | "regular">(search.customer_id ? "regular" : "walkin");
+  const [customerType, setCustomerType] = useState<"walkin" | "regular">(
+    search.customer_id ? "regular" : "walkin",
+  );
   const [customerId, setCustomerId] = useState<string | undefined>(search.customer_id);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [qty, setQty] = useState<number>(1);
@@ -80,18 +82,27 @@ function DeliveriesPage() {
 
   useEffect(() => {
     if (!user) return;
-    const ch = supabase.channel("deliveries-page").on("postgres_changes",
-      { event: "*", schema: "public", table: "deliveries", filter: `worker_id=eq.${user.id}` },
-      () => qc.invalidateQueries({ queryKey: ["active-lot"] })
-    ).subscribe();
-    return () => { supabase.removeChannel(ch); };
+    const ch = supabase
+      .channel("deliveries-page")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "deliveries", filter: `worker_id=eq.${user.id}` },
+        () => qc.invalidateQueries({ queryKey: ["active-lot"] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
   }, [user, qc]);
 
   const lot = activeLotQ.data;
   const taken = lot?.total_bottles ?? 0;
   const sold = lot?.deliveries?.reduce((a: number, d: any) => a + d.bottles_delivered, 0) ?? 0;
   const stock = taken - sold;
-  const selectedCustomer = useMemo(() => (customersQ.data ?? []).find((c) => c.id === customerId), [customerId, customersQ.data]);
+  const selectedCustomer = useMemo(
+    () => (customersQ.data ?? []).find((c) => c.id === customerId),
+    [customerId, customersQ.data],
+  );
   const unitPrice = parseFloat(price) || 0;
   const total = qty * unitPrice;
 
@@ -119,15 +130,32 @@ function DeliveriesPage() {
       if (error) throw error;
       // auto-complete lot if stock=0
       if (qty >= stock) {
-        await supabase.from("lots").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", lot.id);
+        await supabase
+          .from("lots")
+          .update({ status: "completed", completed_at: new Date().toISOString() })
+          .eq("id", lot.id);
       }
-      const { data: admins } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
+      const { data: admins } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "admin");
       if (admins?.length) {
-        await supabase.from("notifications").insert(admins.map((a) => ({
-          user_id: a.user_id,
-          kind: "delivery",
-          message: `${name || "Worker"} delivered ${qty} bottle${qty > 1 ? "s" : ""} · ${formatRs(total)} · ${mode}`,
-        })));
+        await supabase.from("notifications").insert(
+          admins.map((a) => ({
+            user_id: a.user_id,
+            kind: "delivery",
+            message: `${name || "Worker"} delivered ${qty} bottle${qty > 1 ? "s" : ""} · ${formatRs(total)} · ${mode}`,
+          })),
+        );
+        import("@/lib/push-server").then(({ notifyAdminsPush }) => {
+          notifyAdminsPush({
+            data: {
+              title: "New Delivery Recorded 🚚",
+              body: `${name || "Worker"} delivered ${qty} bottle${qty > 1 ? "s" : ""} · ${formatRs(total)} · ${mode.toUpperCase()}`,
+              url: "/admin/dashboard",
+            },
+          });
+        });
       }
       // self confirmation
       await supabase.from("notifications").insert({
@@ -179,7 +207,9 @@ function DeliveriesPage() {
     const all = customersQ.data ?? [];
     if (!searchQuery) return all;
     const term = searchQuery.toLowerCase();
-    return all.filter((c) => c.name.toLowerCase().includes(term) || c.address.toLowerCase().includes(term));
+    return all.filter(
+      (c) => c.name.toLowerCase().includes(term) || c.address.toLowerCase().includes(term),
+    );
   }, [customersQ.data, searchQuery]);
 
   return (
@@ -207,9 +237,18 @@ function DeliveriesPage() {
                 </div>
               </div>
               <div className="mt-3 grid grid-cols-3 divide-x divide-border text-center">
-                <div><p className="text-xs text-muted-foreground">Taken</p><p className="font-bold text-primary">{taken}</p></div>
-                <div><p className="text-xs text-muted-foreground">Sold</p><p className="font-bold text-success">{sold}</p></div>
-                <div><p className="text-xs text-muted-foreground">Stock</p><p className="font-bold text-warning">{stock}</p></div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Taken</p>
+                  <p className="font-bold text-primary">{taken}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Sold</p>
+                  <p className="font-bold text-success">{sold}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Stock</p>
+                  <p className="font-bold text-warning">{stock}</p>
+                </div>
               </div>
             </div>
 
@@ -245,7 +284,9 @@ function DeliveriesPage() {
                     }}
                     className="h-12 w-full rounded-lg border border-border bg-card px-3 text-left text-sm flex items-center justify-between"
                   >
-                    <span className={selectedCustomer ? "text-foreground" : "text-muted-foreground"}>
+                    <span
+                      className={selectedCustomer ? "text-foreground" : "text-muted-foreground"}
+                    >
                       {selectedCustomer ? selectedCustomer.name : "Select customer"}
                     </span>
                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -289,11 +330,35 @@ function DeliveriesPage() {
 
               <Field label="PAYMENT METHOD">
                 <div className="grid grid-cols-2 gap-2">
-                  <PayPill icon={Banknote} label="Cash" value="cash" current={mode} onClick={setMode} />
-                  <PayPill icon={CreditCard} label="Card" value="card" current={mode} onClick={setMode} />
-                  <PayPill icon={Globe} label="Online" value="online" current={mode} onClick={setMode} />
+                  <PayPill
+                    icon={Banknote}
+                    label="Cash"
+                    value="cash"
+                    current={mode}
+                    onClick={setMode}
+                  />
+                  <PayPill
+                    icon={CreditCard}
+                    label="Card"
+                    value="card"
+                    current={mode}
+                    onClick={setMode}
+                  />
+                  <PayPill
+                    icon={Globe}
+                    label="Online"
+                    value="online"
+                    current={mode}
+                    onClick={setMode}
+                  />
                   {customerType === "regular" && (
-                    <PayPill icon={Clock} label="Pending" value="pending" current={mode} onClick={setMode} />
+                    <PayPill
+                      icon={Clock}
+                      label="Pending"
+                      value="pending"
+                      current={mode}
+                      onClick={setMode}
+                    />
                   )}
                 </div>
               </Field>
@@ -316,7 +381,7 @@ function DeliveriesPage() {
           <div className="absolute inset-x-0 bottom-0 bg-card rounded-t-[20px] mx-auto max-w-[390px] p-5 max-h-[70vh] flex flex-col animate-in slide-in-from-bottom duration-200">
             <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-border shrink-0" />
             <h3 className="text-lg font-bold mb-3 shrink-0">Select Customer</h3>
-            
+
             <div className="relative mb-3 shrink-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
@@ -327,10 +392,12 @@ function DeliveriesPage() {
                 className="w-full h-11 pl-9 pr-3 rounded-[10px] border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
-            
+
             <div className="flex-1 overflow-y-auto space-y-2">
               {filteredCustomers.length === 0 && (
-                <p className="text-sm text-muted-foreground py-6 text-center">No customers found.</p>
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  No customers found.
+                </p>
               )}
               {filteredCustomers.map((c) => (
                 <button
@@ -354,7 +421,15 @@ function DeliveriesPage() {
   );
 }
 
-function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
+function Field({
+  label,
+  children,
+  error,
+}: {
+  label: string;
+  children: React.ReactNode;
+  error?: string;
+}) {
   return (
     <div>
       <p className="text-xs font-bold tracking-wider text-muted-foreground mb-2">{label}</p>
@@ -364,15 +439,27 @@ function Field({ label, children, error }: { label: string; children: React.Reac
   );
 }
 
-function PayPill({ icon: Icon, label, value, current, onClick }: { icon: any; label: string; value: Mode; current: Mode; onClick: (m: Mode) => void }) {
+function PayPill({
+  icon: Icon,
+  label,
+  value,
+  current,
+  onClick,
+}: {
+  icon: any;
+  label: string;
+  value: Mode;
+  current: Mode;
+  onClick: (m: Mode) => void;
+}) {
   const active = current === value;
   return (
     <button
       type="button"
       onClick={() => onClick(value)}
       className={`h-11 rounded-full border text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors ${
-        active 
-          ? "bg-primary border-primary text-primary-foreground" 
+        active
+          ? "bg-primary border-primary text-primary-foreground"
           : "bg-card border-border text-muted-foreground hover:bg-muted/50"
       }`}
     >
@@ -380,4 +467,3 @@ function PayPill({ icon: Icon, label, value, current, onClick }: { icon: any; la
     </button>
   );
 }
-

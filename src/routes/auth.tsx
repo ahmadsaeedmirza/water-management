@@ -63,7 +63,9 @@ function AuthPage() {
         </div>
 
         <div className="mt-10 text-center">
-          <h1 className="text-3xl font-bold tracking-tight">{mode === "signin" ? "Welcome Back" : "Create Account"}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {mode === "signin" ? "Welcome Back" : "Create Account"}
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">Manage your deliveries efficiently</p>
         </div>
 
@@ -97,7 +99,11 @@ function AuthPage() {
           <div>
             <div className="flex justify-between">
               <label className="text-sm font-medium">Password</label>
-              {mode === "signin" && <button type="button" className="text-sm font-medium text-primary">Forgot?</button>}
+              {mode === "signin" && (
+                <button type="button" className="text-sm font-medium text-primary">
+                  Forgot?
+                </button>
+              )}
             </div>
             <div className="relative mt-1.5">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -110,7 +116,11 @@ function AuthPage() {
                 className="h-12 w-full rounded-lg border border-border bg-card pl-10 pr-10 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/15"
                 placeholder="••••••••"
               />
-              <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => setShowPw((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              >
                 {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
@@ -128,9 +138,19 @@ function AuthPage() {
 
         <div className="mt-6 border-t border-border pt-5 text-center text-sm text-muted-foreground">
           {mode === "signin" ? (
-            <>Need access? <button onClick={() => setMode("signup")} className="font-semibold text-primary">Create Account</button></>
+            <>
+              Need access?{" "}
+              <button onClick={() => setMode("signup")} className="font-semibold text-primary">
+                Create Account
+              </button>
+            </>
           ) : (
-            <>Already have an account? <button onClick={() => setMode("signin")} className="font-semibold text-primary">Sign In</button></>
+            <>
+              Already have an account?{" "}
+              <button onClick={() => setMode("signin")} className="font-semibold text-primary">
+                Sign In
+              </button>
+            </>
           )}
         </div>
       </div>

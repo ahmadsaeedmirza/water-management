@@ -20,7 +20,11 @@ function ExpensesPage() {
   const [amount, setAmount] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const today = (() => { const d = new Date(); d.setHours(0,0,0,0); return d.toISOString(); })();
+  const today = (() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString();
+  })();
 
   const expensesQ = useQuery({
     queryKey: ["expenses", user?.id, today],
@@ -47,13 +51,27 @@ function ExpensesPage() {
         amount: amt,
       });
       if (error) throw error;
-      const { data: admins } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
+      const { data: admins } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "admin");
       if (admins?.length) {
-        await supabase.from("notifications").insert(admins.map((a) => ({
-          user_id: a.user_id,
-          kind: "expense",
-          message: `${name || "Worker"} added expense "${eName.trim()}" · ${formatRs(amt)}`,
-        })));
+        await supabase.from("notifications").insert(
+          admins.map((a) => ({
+            user_id: a.user_id,
+            kind: "expense",
+            message: `${name || "Worker"} added expense "${eName.trim()}" · ${formatRs(amt)}`,
+          })),
+        );
+        import("@/lib/push-server").then(({ notifyAdminsPush }) => {
+          notifyAdminsPush({
+            data: {
+              title: "New Expense Added 💸",
+              body: `${name || "Worker"} added expense "${eName.trim()}" · ${formatRs(amt)}`,
+              url: "/admin/dashboard",
+            },
+          });
+        });
       }
       // self confirmation
       await supabase.from("notifications").insert({
@@ -64,7 +82,10 @@ function ExpensesPage() {
     },
     onSuccess: () => {
       toast.success("Expense added");
-      setEName(""); setAmount(""); setErrors({}); setOpen(false);
+      setEName("");
+      setAmount("");
+      setErrors({});
+      setOpen(false);
       qc.invalidateQueries({ queryKey: ["expenses"] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to add expense"),
@@ -141,7 +162,9 @@ function ExpensesPage() {
 
             <div className="mt-5 space-y-4">
               <div>
-                <label className="text-xs font-bold tracking-wider text-muted-foreground">DATE & TIME</label>
+                <label className="text-xs font-bold tracking-wider text-muted-foreground">
+                  DATE & TIME
+                </label>
                 <input
                   type="text"
                   value={`Today, ${formatTime(new Date())}`}
@@ -151,7 +174,9 @@ function ExpensesPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-bold tracking-wider text-muted-foreground">EXPENSE NAME</label>
+                <label className="text-xs font-bold tracking-wider text-muted-foreground">
+                  EXPENSE NAME
+                </label>
                 <input
                   value={eName}
                   onChange={(e) => {
@@ -161,10 +186,14 @@ function ExpensesPage() {
                   placeholder="e.g. Fuel"
                   className="mt-2 h-12 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/15"
                 />
-                {errors.name && <p className="text-xs text-destructive mt-1 font-semibold">{errors.name}</p>}
+                {errors.name && (
+                  <p className="text-xs text-destructive mt-1 font-semibold">{errors.name}</p>
+                )}
               </div>
               <div>
-                <label className="text-xs font-bold tracking-wider text-muted-foreground">AMOUNT (Rs.)</label>
+                <label className="text-xs font-bold tracking-wider text-muted-foreground">
+                  AMOUNT (Rs.)
+                </label>
                 <input
                   type="number"
                   inputMode="numeric"
@@ -176,7 +205,9 @@ function ExpensesPage() {
                   placeholder="0"
                   className="mt-2 h-12 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/15"
                 />
-                {errors.amount && <p className="text-xs text-destructive mt-1 font-semibold">{errors.amount}</p>}
+                {errors.amount && (
+                  <p className="text-xs text-destructive mt-1 font-semibold">{errors.amount}</p>
+                )}
               </div>
             </div>
 
@@ -193,4 +224,3 @@ function ExpensesPage() {
     </WorkerShell>
   );
 }
-

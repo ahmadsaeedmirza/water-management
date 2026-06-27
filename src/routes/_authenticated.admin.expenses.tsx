@@ -20,7 +20,11 @@ function AdminExpenses() {
       let qry = supabase.from("expenses").select("*").order("created_at", { ascending: false });
       if (range !== "all") {
         const d = new Date();
-        if (range === "today") d.setHours(0, 0, 0, 0); else { d.setDate(1); d.setHours(0, 0, 0, 0); }
+        if (range === "today") d.setHours(0, 0, 0, 0);
+        else {
+          d.setDate(1);
+          d.setHours(0, 0, 0, 0);
+        }
         qry = qry.gte("created_at", d.toISOString());
       }
       const { data, error } = await qry;
@@ -30,8 +34,15 @@ function AdminExpenses() {
   });
 
   useEffect(() => {
-    const ch = supabase.channel("adm-expenses-list").on("postgres_changes", { event: "*", schema: "public", table: "expenses" }, () => qc.invalidateQueries({ queryKey: ["adm-expenses-list"] })).subscribe();
-    return () => { supabase.removeChannel(ch); };
+    const ch = supabase
+      .channel("adm-expenses-list")
+      .on("postgres_changes", { event: "*", schema: "public", table: "expenses" }, () =>
+        qc.invalidateQueries({ queryKey: ["adm-expenses-list"] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
   }, [qc]);
 
   const list = q.data ?? [];
@@ -46,7 +57,11 @@ function AdminExpenses() {
         </div>
         <div className="inline-flex rounded-[10px] bg-muted p-1">
           {(["today", "month", "all"] as const).map((r) => (
-            <button key={r} onClick={() => setRange(r)} className={`px-3 h-9 rounded-[8px] text-xs font-semibold capitalize ${range === r ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`}>
+            <button
+              key={r}
+              onClick={() => setRange(r)}
+              className={`px-3 h-9 rounded-[8px] text-xs font-semibold capitalize ${range === r ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`}
+            >
               {r === "today" ? "Today" : r === "month" ? "Month" : "All"}
             </button>
           ))}
@@ -55,7 +70,9 @@ function AdminExpenses() {
 
       {list.length === 0 ? (
         <div className="card-surface p-10 text-center">
-          <div className="h-14 w-14 mx-auto rounded-2xl bg-accent grid place-items-center"><Receipt className="h-7 w-7 text-primary" /></div>
+          <div className="h-14 w-14 mx-auto rounded-2xl bg-accent grid place-items-center">
+            <Receipt className="h-7 w-7 text-primary" />
+          </div>
           <p className="mt-3 font-bold">No expenses logged</p>
           <p className="text-sm text-muted-foreground">Expenses will appear as workers log them.</p>
         </div>
@@ -66,7 +83,9 @@ function AdminExpenses() {
               <li key={e.id} className="px-5 py-3 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-semibold text-sm truncate">{e.name}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(e.created_at)} · {formatTime(e.created_at)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDate(e.created_at)} · {formatTime(e.created_at)}
+                  </p>
                 </div>
                 <p className="font-bold tabular-nums text-destructive">{formatRs(e.amount)}</p>
               </li>

@@ -56,30 +56,30 @@
   --radius: 12px;
 
   /* Shifaf Aab palette */
-  --background: oklch(0.984 0.005 240);          /* #F8FAFC */
-  --foreground: oklch(0.193 0.034 264);          /* #0F172A */
+  --background: oklch(0.984 0.005 240); /* #F8FAFC */
+  --foreground: oklch(0.193 0.034 264); /* #0F172A */
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.193 0.034 264);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.193 0.034 264);
 
-  --primary: oklch(0.52 0.13 235);               /* ~#0077B6 */
+  --primary: oklch(0.52 0.13 235); /* ~#0077B6 */
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.72 0.13 215);             /* ~#00B4D8 */
+  --secondary: oklch(0.72 0.13 215); /* ~#00B4D8 */
   --secondary-foreground: oklch(0.193 0.034 264);
-  --accent: oklch(0.9 0.06 215);                 /* ~#90E0EF */
+  --accent: oklch(0.9 0.06 215); /* ~#90E0EF */
   --accent-foreground: oklch(0.193 0.034 264);
 
   --muted: oklch(0.968 0.007 247);
-  --muted-foreground: oklch(0.53 0.04 257);      /* #64748B */
-  --destructive: oklch(0.65 0.22 27);            /* #EF4444 */
+  --muted-foreground: oklch(0.53 0.04 257); /* #64748B */
+  --destructive: oklch(0.65 0.22 27); /* #EF4444 */
   --destructive-foreground: oklch(1 0 0);
-  --success: oklch(0.68 0.14 165);               /* #10B981 */
+  --success: oklch(0.68 0.14 165); /* #10B981 */
   --success-foreground: oklch(1 0 0);
-  --warning: oklch(0.78 0.16 75);                /* #F59E0B */
+  --warning: oklch(0.78 0.16 75); /* #F59E0B */
   --warning-foreground: oklch(0.193 0.034 264);
 
-  --border: oklch(0.91 0.015 250);               /* #E2E8F0 */
+  --border: oklch(0.91 0.015 250); /* #E2E8F0 */
   --input: oklch(0.91 0.015 250);
   --ring: oklch(0.52 0.13 235);
 
@@ -104,7 +104,13 @@
     border-color: var(--color-border);
   }
 
-  html, body {
+  *:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  html,
+  body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);

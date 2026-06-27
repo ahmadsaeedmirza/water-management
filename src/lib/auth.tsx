@@ -57,8 +57,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setRole((roleRow?.role as AppRole) ?? "worker");
       setName(profile?.name || session.user.email?.split("@")[0] || "");
       setLoading(false);
+
+      import("./push-notifications").then(({ setupPushNotifications }) => {
+        setupPushNotifications(uid);
+      });
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [session]);
 
   const signOut = async () => {
@@ -66,7 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthCtx.Provider value={{ session, user: session?.user ?? null, role, name, loading, signOut }}>
+    <AuthCtx.Provider
+      value={{ session, user: session?.user ?? null, role, name, loading, signOut }}
+    >
       {children}
     </AuthCtx.Provider>
   );

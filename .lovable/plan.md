@@ -7,6 +7,7 @@ A mobile-first PWA with two roles (Admin, Worker), Supabase-backed auth/data/rea
 Because this scope is very large, I'll deliver it in two phases so you get a working app fast and can validate direction before I build the heavier admin reporting pieces.
 
 **Phase 1 — Foundation + Worker app (this build)**
+
 1. Enable Lovable Cloud and create the full schema (users/profiles, customers, lots, deliveries, payments, expenses, notifications) with RLS + a `user_roles` table + `has_role()` SECURITY DEFINER function.
 2. Design system in `src/styles.css`: exact tokens from the spec (Primary `#0077B6`, etc.), Inter font via `<link>`, tabular numerals, card/button/input variants matching the screenshots.
 3. Auth: single `/auth` login screen (email + password) matching the login mock; role-based redirect; `_authenticated` gate; admin-only and worker-only nested gates.
@@ -15,6 +16,7 @@ Because this scope is very large, I'll deliver it in two phases so you get a wor
 6. Supabase Realtime on lots/deliveries for live "sold so far" counts.
 
 **Phase 2 — Admin app + PDFs (next turn after you confirm Phase 1 looks right)**
+
 - Admin dashboard with KPI cards, weekly bar chart (recharts), today/month filter, recent activity, customers summary.
 - Lots accordion, Customers list + ledger + Record Payment sheet, Expenses (read-only), Notifications feed with realtime + unread state.
 - Bills page with date-range / monthly / daily PDF downloads via `@react-pdf/renderer`.
@@ -36,6 +38,7 @@ Because this scope is very large, I'll deliver it in two phases so you get a wor
 - **No edge functions** — all server logic via `createServerFn` per stack rules.
 
 ### Out of scope for Phase 1
+
 Admin screens, PDF generation, Web Push, and the chart are scheduled for Phase 2 to keep this build focused and reviewable. The schema and notifications system land in Phase 1 so Phase 2 is purely UI + reports.
 
 Shall I proceed with Phase 1?

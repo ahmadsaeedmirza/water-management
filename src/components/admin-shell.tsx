@@ -1,5 +1,15 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, PackageOpen, Users, Receipt, Bell, FileText, LogOut, Droplet, type LucideIcon } from "lucide-react";
+import {
+  LayoutDashboard,
+  PackageOpen,
+  Users,
+  Receipt,
+  Bell,
+  FileText,
+  LogOut,
+  Droplet,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +31,17 @@ const mobileNav = [
   { to: "/admin/notifications", label: "Notifications", icon: Bell },
 ];
 
-export function AdminShell({ children, title, subtitle, right }: { children: ReactNode; title: ReactNode; subtitle?: ReactNode; right?: ReactNode }) {
+export function AdminShell({
+  children,
+  title,
+  subtitle,
+  right,
+}: {
+  children: ReactNode;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  right?: ReactNode;
+}) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { name, signOut, user } = useAuth();
   const [unread, setUnread] = useState(0);
@@ -41,7 +61,10 @@ export function AdminShell({ children, title, subtitle, right }: { children: Rea
       .channel("admin-notifs-shell")
       .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, load)
       .subscribe();
-    return () => { cancelled = true; supabase.removeChannel(ch); };
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(ch);
+    };
   }, [user]);
 
   const Sidebar = (
@@ -68,7 +91,9 @@ export function AdminShell({ children, title, subtitle, right }: { children: Rea
               <Icon className="h-4.5 w-4.5" strokeWidth={active ? 2.5 : 2} />
               <span className="flex-1">{n.label}</span>
               {n.to === "/admin/notifications" && unread > 0 && (
-                <span className="ml-auto inline-flex h-5 min-w-5 px-1.5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[11px] font-bold tabular-nums">{unread}</span>
+                <span className="ml-auto inline-flex h-5 min-w-5 px-1.5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[11px] font-bold tabular-nums">
+                  {unread}
+                </span>
               )}
             </Link>
           );
@@ -114,9 +139,11 @@ export function AdminShell({ children, title, subtitle, right }: { children: Rea
             const isReports = t.label === "Reports";
             const isBills = t.label === "Bills";
             const active = isReports
-              ? pathname.startsWith("/admin/bills") && window.location.search.includes("tab=reports")
+              ? pathname.startsWith("/admin/bills") &&
+                window.location.search.includes("tab=reports")
               : isBills
-                ? pathname.startsWith("/admin/bills") && !window.location.search.includes("tab=reports")
+                ? pathname.startsWith("/admin/bills") &&
+                  !window.location.search.includes("tab=reports")
                 : pathname.startsWith(t.to);
             const Icon = t.icon;
             return (
@@ -125,15 +152,26 @@ export function AdminShell({ children, title, subtitle, right }: { children: Rea
                 to={t.to}
                 className="flex flex-col items-center gap-1 py-2 text-[10px] font-medium"
               >
-                <span className={`grid place-items-center h-8 w-12 rounded-full transition-colors ${active ? "bg-accent" : ""}`}>
+                <span
+                  className={`grid place-items-center h-8 w-12 rounded-full transition-colors ${active ? "bg-accent" : ""}`}
+                >
                   <span className="relative">
-                    <Icon className={`h-4.5 w-4.5 ${active ? "text-primary" : "text-muted-foreground"}`} strokeWidth={active ? 2.5 : 2} />
+                    <Icon
+                      className={`h-4.5 w-4.5 ${active ? "text-primary" : "text-muted-foreground"}`}
+                      strokeWidth={active ? 2.5 : 2}
+                    />
                     {t.label === "Notifications" && unread > 0 && (
-                      <span className="absolute -top-1.5 -right-2 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[8px] font-bold">{unread}</span>
+                      <span className="absolute -top-1.5 -right-2 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[8px] font-bold">
+                        {unread}
+                      </span>
                     )}
                   </span>
                 </span>
-                <span className={`${active ? "text-primary font-semibold" : "text-muted-foreground"}`}>{t.label}</span>
+                <span
+                  className={`${active ? "text-primary font-semibold" : "text-muted-foreground"}`}
+                >
+                  {t.label}
+                </span>
               </Link>
             );
           })}
@@ -142,4 +180,3 @@ export function AdminShell({ children, title, subtitle, right }: { children: Rea
     </div>
   );
 }
-

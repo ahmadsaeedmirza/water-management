@@ -13,9 +13,7 @@ export function WorkerShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-[390px] min-h-screen pb-24">
-        {children}
-      </div>
+      <div className="mx-auto max-w-[390px] min-h-screen pb-24">{children}</div>
       <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card">
         <div className="mx-auto max-w-[390px] grid grid-cols-4">
           {tabs.map((t) => {
@@ -27,10 +25,19 @@ export function WorkerShell({ children }: { children: ReactNode }) {
                 to={t.to}
                 className="flex flex-col items-center gap-1 py-2.5 text-xs"
               >
-                <span className={`grid place-items-center h-9 w-14 rounded-full transition-colors ${active ? "bg-accent" : ""}`}>
-                  <Icon className={`h-5 w-5 ${active ? "text-primary" : "text-muted-foreground"}`} strokeWidth={active ? 2.5 : 2} />
+                <span
+                  className={`grid place-items-center h-9 w-14 rounded-full transition-colors ${active ? "bg-accent" : ""}`}
+                >
+                  <Icon
+                    className={`h-5 w-5 ${active ? "text-primary" : "text-muted-foreground"}`}
+                    strokeWidth={active ? 2.5 : 2}
+                  />
                 </span>
-                <span className={`${active ? "text-primary font-semibold" : "text-muted-foreground"}`}>{t.label}</span>
+                <span
+                  className={`${active ? "text-primary font-semibold" : "text-muted-foreground"}`}
+                >
+                  {t.label}
+                </span>
               </Link>
             );
           })}
@@ -40,7 +47,15 @@ export function WorkerShell({ children }: { children: ReactNode }) {
   );
 }
 
-export function TopBar({ title, subtitle, right }: { title: ReactNode; subtitle?: ReactNode; right?: ReactNode }) {
+export function TopBar({
+  title,
+  subtitle,
+  right,
+}: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  right?: ReactNode;
+}) {
   return (
     <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border px-5 py-4">
       <div className="flex items-center justify-between gap-3">

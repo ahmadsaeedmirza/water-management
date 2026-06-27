@@ -44,4 +44,3 @@ function AuthGate() {
 
   return <Outlet />;
 }
-

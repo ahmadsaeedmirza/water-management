@@ -11,7 +11,11 @@ export const Route = createFileRoute("/_authenticated/worker/customers")({
   component: CustomersPage,
 });
 
-const AVATAR_TONES = ["bg-accent/60 text-primary", "bg-secondary/30 text-primary", "bg-primary/15 text-primary"];
+const AVATAR_TONES = [
+  "bg-accent/60 text-primary",
+  "bg-secondary/30 text-primary",
+  "bg-primary/15 text-primary",
+];
 
 function CustomersPage() {
   const navigate = useNavigate();
@@ -62,11 +66,17 @@ function CustomersPage() {
     if (!user) return;
     const ch = supabase
       .channel("worker-customers")
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, () => {
-        qc.invalidateQueries({ queryKey: ["worker-notifs"] });
-      })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["worker-notifs"] });
+        },
+      )
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => {
+      supabase.removeChannel(ch);
+    };
   }, [user, qc]);
 
   const all = customersQ.data ?? [];
@@ -99,7 +109,9 @@ function CustomersPage() {
       <div className="px-5 py-5 space-y-5">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Worker Customers</h2>
-          <p className="text-sm text-muted-foreground mt-1">Manage and log deliveries for your route.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage and log deliveries for your route.
+          </p>
         </div>
 
         <div className="relative">
@@ -132,7 +144,9 @@ function CustomersPage() {
             {filtered.map((c, i) => (
               <div key={c.id} className="card-surface p-4">
                 <div className="flex items-start gap-3">
-                  <div className={`h-12 w-12 shrink-0 rounded-full grid place-items-center font-bold ${AVATAR_TONES[i % AVATAR_TONES.length]}`}>
+                  <div
+                    className={`h-12 w-12 shrink-0 rounded-full grid place-items-center font-bold ${AVATAR_TONES[i % AVATAR_TONES.length]}`}
+                  >
                     {initials(c.name)}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -144,7 +158,9 @@ function CustomersPage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => navigate({ to: "/worker/deliveries", search: { customer_id: c.id } })}
+                  onClick={() =>
+                    navigate({ to: "/worker/deliveries", search: { customer_id: c.id } })
+                  }
                   className="mt-3 h-10 px-4 rounded-[10px] bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-2"
                 >
                   <Truck className="h-4 w-4" /> Log Delivery
@@ -161,7 +177,12 @@ function CustomersPage() {
           <div className="relative w-full max-w-[320px] h-full bg-card border-l border-border p-5 flex flex-col animate-in slide-in-from-right duration-250">
             <div className="flex items-center justify-between pb-3 border-b border-border mb-4">
               <h2 className="font-bold text-lg">My Activity</h2>
-              <button onClick={() => setNotifOpen(false)} className="text-sm font-semibold text-muted-foreground">Close</button>
+              <button
+                onClick={() => setNotifOpen(false)}
+                className="text-sm font-semibold text-muted-foreground"
+              >
+                Close
+              </button>
             </div>
             <div className="flex-1 overflow-y-auto space-y-3">
               {notificationsQ.isLoading ? (
@@ -170,11 +191,18 @@ function CustomersPage() {
                   <div className="h-10 bg-muted rounded-lg" />
                 </div>
               ) : notifications.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">No confirmations yet.</p>
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  No confirmations yet.
+                </p>
               ) : (
                 notifications.map((n: any) => (
-                  <div key={n.id} className="p-3 border border-border rounded-xl bg-muted/40 text-xs">
-                    <p className="font-medium text-foreground">{n.message} · {relativeTime(n.created_at)}</p>
+                  <div
+                    key={n.id}
+                    className="p-3 border border-border rounded-xl bg-muted/40 text-xs"
+                  >
+                    <p className="font-medium text-foreground">
+                      {n.message} · {relativeTime(n.created_at)}
+                    </p>
                   </div>
                 ))
               )}
@@ -185,16 +213,6 @@ function CustomersPage() {
     </WorkerShell>
   );
 }
-
-function Stat({ label, value, tone }: { label: string; value: string; tone: string }) {
-  return (
-    <div className="card-surface p-3">
-      <p className="text-[10px] font-bold tracking-widest text-muted-foreground">{label}</p>
-      <p className={`text-xl font-bold mt-1 ${tone}`}>{value}</p>
-    </div>
-  );
-}
-
 
 function Stat({ label, value, tone }: { label: string; value: string; tone: string }) {
   return (
