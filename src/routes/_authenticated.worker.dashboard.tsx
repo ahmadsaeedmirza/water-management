@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Droplet, Bell, Plus, Truck, Receipt } from "lucide-react";
+import { Droplet, Bell, Plus, Truck, Receipt, Settings } from "lucide-react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +27,7 @@ function WorkerDashboard() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [bottles, setBottles] = useState("");
   const [notifOpen, setNotifOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   const today = startOfToday();
 
@@ -66,7 +67,7 @@ function WorkerDashboard() {
       const { data, error } = await supabase
         .from("notifications")
         .select("*")
-        .eq("user_id", user!.id)
+        .eq("worker_id", user!.id)
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -79,7 +80,7 @@ function WorkerDashboard() {
       const { error } = await supabase
         .from("notifications")
         .update({ is_read: true })
-        .eq("user_id", user!.id)
+        .eq("worker_id", user!.id)
         .eq("is_read", false);
       if (error) throw error;
     },
@@ -108,7 +109,7 @@ function WorkerDashboard() {
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        { event: "*", schema: "public", table: "notifications", filter: `worker_id=eq.${user.id}` },
         () => {
           qc.invalidateQueries({ queryKey: ["worker-notifs"] });
         },
@@ -127,7 +128,7 @@ function WorkerDashboard() {
   );
   const totalRevenue = lots.reduce(
     (s, l: any) =>
-      s + (l.deliveries?.reduce((a: number, d: any) => a + Number(d.total_amount), 0) ?? 0),
+      s + (l.deliveries?.filter((d: any) => d.payment_mode !== "pending").reduce((a: number, d: any) => a + Number(d.total_amount), 0) ?? 0),
     0,
   );
   const activeLots = lots.filter((l: any) => l.status === "active").length;
@@ -152,6 +153,7 @@ function WorkerDashboard() {
         await supabase.from("notifications").insert(
           admins.map((a) => ({
             user_id: a.user_id,
+            worker_id: user!.id,
             kind: "lot_started",
             message: `${name || "Worker"} started a new lot of ${n} bottles`,
           })),
@@ -186,18 +188,26 @@ function WorkerDashboard() {
             {greeting()}, {name || "there"} 👋
           </h1>
         </div>
-        <button
-          onClick={() => {
-            setNotifOpen(true);
-            if (hasUnreadNotifs) markAllRead.mutate();
-          }}
-          className="h-10 w-10 grid place-items-center rounded-full text-primary relative"
-        >
-          <Bell className="h-5 w-5" />
-          {hasUnreadNotifs && (
-            <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-destructive animate-pulse" />
-          )}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setPasswordOpen(true)}
+            className="h-10 w-10 grid place-items-center rounded-full text-muted-foreground hover:bg-muted"
+          >
+            <Settings className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => {
+              setNotifOpen(true);
+              if (hasUnreadNotifs) markAllRead.mutate();
+            }}
+            className="h-10 w-10 grid place-items-center rounded-full text-primary relative"
+          >
+            <Bell className="h-5 w-5" />
+            {hasUnreadNotifs && (
+              <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-destructive animate-pulse" />
+            )}
+          </button>
+        </div>
       </header>
 
       <div className="px-5 py-5 space-y-5">
@@ -247,11 +257,12 @@ function WorkerDashboard() {
               <div className="h-20 rounded-xl bg-muted animate-pulse" />
             </div>
           ) : lots.length === 0 ? (
-            <EmptyState
-              icon={<Truck className="h-8 w-8 text-muted-foreground" />}
-              title="No lots yet"
-              hint="Start a new lot to begin logging deliveries."
-            />
+            <div className="flex flex-col items-center justify-center py-12 px-6 text-center space-y-3 bg-card rounded-xl border border-border">
+              <Truck className="h-12 w-12 text-[#90E0EF]" />
+              <p className="text-[#64748B] text-sm font-medium">
+                No lots started today. Tap 'Start New Lot' to begin.
+              </p>
+            </div>
           ) : (
             <div className="space-y-3">
               {lots.map((l: any) => {
@@ -261,7 +272,7 @@ function WorkerDashboard() {
                 return (
                   <button
                     key={l.id}
-                    onClick={() => navigate({ to: "/worker/deliveries", search: { lotId: l.id } })}
+                    onClick={() => navigate({ to: "/worker/deliveries", search: { lotId: l.id, customer_id: undefined } })}
                     className="w-full text-left card-surface relative pl-4 pr-4 py-3.5 flex items-center gap-3"
                   >
                     <span
@@ -316,9 +327,10 @@ function WorkerDashboard() {
                   <div className="h-10 bg-muted rounded-lg" />
                 </div>
               ) : notifications.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                  No confirmations yet.
-                </p>
+                <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-3">
+                  <Bell className="h-12 w-12 text-[#90E0EF]" />
+                  <p className="text-[#64748B] text-sm font-medium">No activity yet</p>
+                </div>
               ) : (
                 notifications.map((n: any) => (
                   <div
@@ -349,7 +361,117 @@ function WorkerDashboard() {
           submitting={createLot.isPending}
         />
       )}
+
+      {passwordOpen && <ChangePasswordSheet onClose={() => setPasswordOpen(false)} />}
     </WorkerShell>
+  );
+}
+
+function ChangePasswordSheet({ onClose }: { onClose: () => void }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleUpdate = async () => {
+    setError("");
+    setSuccess("");
+    
+    if (!currentPassword) {
+      setError("Current password is required");
+      return;
+    }
+    if (!newPassword) {
+      setError("New password is required");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError("New password must be at least 8 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Confirm password does not match");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setSuccess("Password updated successfully");
+      toast.success("Password updated successfully");
+      setTimeout(onClose, 1500);
+    } catch (err: any) {
+      setError(err.message || "Failed to update password");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-x-0 bottom-0 bg-card rounded-t-[20px] mx-auto max-w-[390px] p-6 animate-in slide-in-from-bottom duration-200 space-y-4">
+        <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-border" />
+        <h2 className="text-xl font-bold text-center">Change Password</h2>
+        <p className="text-xs text-muted-foreground text-center">
+          Update your account security password.
+        </p>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground">Current Password</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="w-full h-11 px-3 mt-1 rounded-[10px] border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="Your current password"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground">New Password</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full h-11 px-3 mt-1 rounded-[10px] border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="Min. 8 characters"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground">
+              Confirm New Password
+            </label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full h-11 px-3 mt-1 rounded-[10px] border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="Confirm new password"
+            />
+            {error && <p className="text-xs text-destructive mt-1.5 font-semibold">{error}</p>}
+            {success && <p className="text-xs text-success mt-1.5 font-semibold">{success}</p>}
+          </div>
+        </div>
+
+        <button
+          onClick={handleUpdate}
+          disabled={loading}
+          className="h-12 w-full rounded-[10px] bg-primary text-primary-foreground font-semibold disabled:opacity-50"
+        >
+          {loading ? "Updating..." : "Update Password"}
+        </button>
+        <button
+          onClick={onClose}
+          className="w-full text-center text-xs font-semibold text-muted-foreground py-2"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 

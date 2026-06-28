@@ -59,6 +59,7 @@ function ExpensesPage() {
         await supabase.from("notifications").insert(
           admins.map((a) => ({
             user_id: a.user_id,
+            worker_id: user!.id,
             kind: "expense",
             message: `${name || "Worker"} added expense "${eName.trim()}" · ${formatRs(amt)}`,
           })),
@@ -76,6 +77,7 @@ function ExpensesPage() {
       // self confirmation
       await supabase.from("notifications").insert({
         user_id: user!.id,
+        worker_id: user!.id,
         kind: "expense_self",
         message: `Expense added — ${eName.trim()} · ${formatRs(amt)}`,
       });
@@ -119,12 +121,9 @@ function ExpensesPage() {
         {expensesQ.isLoading ? (
           <div className="h-20 rounded-xl bg-muted animate-pulse" />
         ) : (expensesQ.data ?? []).length === 0 ? (
-          <div className="card-surface p-8 text-center">
-            <div className="h-14 w-14 mx-auto rounded-full bg-muted grid place-items-center">
-              <Receipt className="h-7 w-7 text-muted-foreground" />
-            </div>
-            <p className="mt-3 font-semibold">No expenses today</p>
-            <p className="text-sm text-muted-foreground mt-1">Tap + to add one.</p>
+          <div className="flex flex-col items-center justify-center py-12 px-6 text-center space-y-3 bg-card rounded-xl border border-border">
+            <Receipt className="h-12 w-12 text-[#90E0EF]" />
+            <p className="text-[#64748B] text-sm font-medium">No expenses logged today</p>
           </div>
         ) : (
           (expensesQ.data ?? []).map((e: any) => (

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Search, Truck, MapPin, Bell } from "lucide-react";
+import { Search, Truck, MapPin, Bell, Users } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { WorkerShell } from "@/components/worker-shell";
@@ -135,9 +135,9 @@ function CustomersPage() {
             <div className="h-28 rounded-xl bg-muted animate-pulse" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="card-surface p-8 text-center">
-            <p className="font-semibold">No customers found</p>
-            <p className="text-sm text-muted-foreground mt-1">Ask your admin to add customers.</p>
+          <div className="flex flex-col items-center justify-center py-12 px-6 text-center space-y-3 bg-card rounded-xl border border-border">
+            <Users className="h-12 w-12 text-[#90E0EF]" />
+            <p className="text-[#64748B] text-sm font-medium">No customers added yet</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -159,7 +159,7 @@ function CustomersPage() {
                 </div>
                 <button
                   onClick={() =>
-                    navigate({ to: "/worker/deliveries", search: { customer_id: c.id } })
+                    navigate({ to: "/worker/deliveries", search: { customer_id: c.id, lotId: undefined } })
                   }
                   className="mt-3 h-10 px-4 rounded-[10px] bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-2"
                 >

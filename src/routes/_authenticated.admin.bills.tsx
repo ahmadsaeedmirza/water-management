@@ -28,6 +28,7 @@ function AdminBills() {
   const [downloadingMonth, setDownloadingMonth] = useState<string | null>(null);
   const [dailyDate, setDailyDate] = useState(todayStr());
   const [downloadingDaily, setDownloadingDaily] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
   const customersQ = useQuery({
     queryKey: ["bills-customers"],
@@ -55,13 +56,27 @@ function AdminBills() {
   const fromIso = useMemo(() => new Date(from + "T00:00:00").toISOString(), [from]);
   const toIso = useMemo(() => new Date(to + "T23:59:59").toISOString(), [to]);
 
+  const earliestDeliveryQ = useQuery({
+    queryKey: ["earliest-delivery"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("deliveries")
+        .select("created_at")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const dataQ = useQuery({
     queryKey: ["bills", from, to, customerId],
     queryFn: async () => {
       let dq = supabase
         .from("deliveries")
         .select(
-          "id, bottles_delivered, total_amount, payment_mode, created_at, customer_id, customers(name)",
+          "id, bottles_delivered, total_amount, payment_mode, created_at, customer_id, customer_type, customers(name)",
         )
         .gte("created_at", fromIso)
         .lte("created_at", toIso)
@@ -72,13 +87,13 @@ function AdminBills() {
         customerId !== "all"
           ? supabase
               .from("payments")
-              .select("amount, payment_mode, created_at")
+              .select("amount, payment_mode, created_at, customer_id, customers(name)")
               .eq("customer_id", customerId)
               .gte("created_at", fromIso)
               .lte("created_at", toIso)
           : supabase
               .from("payments")
-              .select("amount, payment_mode, created_at")
+              .select("amount, payment_mode, created_at, customer_id, customers(name)")
               .gte("created_at", fromIso)
               .lte("created_at", toIso),
         supabase
@@ -95,14 +110,29 @@ function AdminBills() {
   });
 
   const data = dataQ.data ?? { deliveries: [], payments: [], expenses: [] };
+  
   const totals = useMemo(() => {
     const bottles = data.deliveries.reduce((a, d: any) => a + d.bottles_delivered, 0);
-    const sales = data.deliveries.reduce((a, d: any) => a + Number(d.total_amount), 0);
-    const expenses = data.expenses.reduce((a, e: any) => a + Number(e.amount), 0);
-    const payments = data.payments.reduce((a, p: any) => a + Number(p.amount), 0);
-    const pending = data.deliveries
-      .filter((d: any) => d.payment_mode === "pending")
+    
+    // Walk-in Revenue = SUM(deliveries where customer_type = 'walkin' AND payment_mode != 'pending')
+    const walkinRev = data.deliveries
+      .filter((d: any) => d.customer_type === "walkin" && d.payment_mode !== "pending")
       .reduce((a, d: any) => a + Number(d.total_amount), 0);
+
+    // Regular Customer Collected Revenue = SUM(payments)
+    const regularCollected = data.payments.reduce((a, p: any) => a + Number(p.amount), 0);
+
+    // Total Revenue = Walk-in Revenue + Regular Customer Collected Revenue
+    const sales = walkinRev + regularCollected;
+    const expenses = data.expenses.reduce((a, e: any) => a + Number(e.amount), 0);
+    const payments = regularCollected;
+    
+    // Pending Collection
+    const regPendingBilled = data.deliveries
+      .filter((d: any) => d.customer_type === "regular" && d.payment_mode === "pending")
+      .reduce((a, d: any) => a + Number(d.total_amount), 0);
+    const pending = Math.max(0, regPendingBilled - regularCollected);
+    
     return { bottles, sales, expenses, payments, pending, net: sales - expenses };
   }, [data]);
 
@@ -129,23 +159,57 @@ function AdminBills() {
     }
   };
 
-  const last6Months = useMemo(() => {
+  const availableYears = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    let startYear = currentYear;
+    if (earliestDeliveryQ.data?.created_at) {
+      startYear = new Date(earliestDeliveryQ.data.created_at).getFullYear();
+    }
+    const years = [];
+    for (let y = currentYear; y >= startYear; y--) {
+      years.push(y);
+    }
+    return years;
+  }, [earliestDeliveryQ.data]);
+
+  const availableMonthsQ = useQuery({
+    queryKey: ["available-months-by-year", selectedYear],
+    queryFn: async () => {
+      const start = new Date(selectedYear, 0, 1).toISOString();
+      const end = new Date(selectedYear, 11, 31, 23, 59, 59).toISOString();
+      
+      const { data, error } = await supabase
+        .from("deliveries")
+        .select("created_at")
+        .gte("created_at", start)
+        .lte("created_at", end);
+      if (error) throw error;
+      
+      const monthsSet = new Set<number>();
+      for (const d of data ?? []) {
+        monthsSet.add(new Date(d.created_at).getMonth());
+      }
+      return Array.from(monthsSet).sort((a, b) => b - a);
+    },
+  });
+
+  const activeMonthCards = useMemo(() => {
     const list = [];
-    for (let i = 0; i < 6; i++) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
+    const months = availableMonthsQ.data ?? [];
+    for (const m of months) {
+      const d = new Date(selectedYear, m, 1);
       list.push({
         label: d.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
-        month: d.getMonth(),
-        year: d.getFullYear(),
-        from: new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10),
-        to: new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10),
+        month: m,
+        year: selectedYear,
+        from: new Date(selectedYear, m, 1).toISOString().slice(0, 10),
+        to: new Date(selectedYear, m + 1, 0).toISOString().slice(0, 10),
       });
     }
     return list;
-  }, []);
+  }, [availableMonthsQ.data, selectedYear]);
 
-  const handleDownloadMonth = async (mPreset: (typeof last6Months)[0]) => {
+  const handleDownloadMonth = async (mPreset: (typeof activeMonthCards)[0]) => {
     setDownloadingMonth(mPreset.label);
     try {
       const fromIso = new Date(mPreset.from + "T00:00:00").toISOString();
@@ -157,8 +221,16 @@ function AdminBills() {
           .select("*, customers(name)")
           .gte("created_at", fromIso)
           .lte("created_at", toIso),
-        supabase.from("payments").select("*").gte("created_at", fromIso).lte("created_at", toIso),
-        supabase.from("expenses").select("*").gte("created_at", fromIso).lte("created_at", toIso),
+        supabase
+          .from("payments")
+          .select("*, customers(name)")
+          .gte("created_at", fromIso)
+          .lte("created_at", toIso),
+        supabase
+          .from("expenses")
+          .select("*")
+          .gte("created_at", fromIso)
+          .lte("created_at", toIso),
       ]);
 
       const deliveries = d.data ?? [];
@@ -166,9 +238,20 @@ function AdminBills() {
       const expenses = e.data ?? [];
 
       const bottles = deliveries.reduce((a, x) => a + x.bottles_delivered, 0);
-      const sales = deliveries.reduce((a, x) => a + Number(x.total_amount), 0);
+      
+      const fromDeliveries = deliveries
+        .filter((x) => x.payment_mode !== "pending")
+        .reduce((a, x) => a + Number(x.total_amount), 0);
+      const fromPayments = payments.reduce((a, x) => a + Number(x.amount), 0);
+      const sales = fromDeliveries + fromPayments;
+
       const expTotal = expenses.reduce((a, x) => a + Number(x.amount), 0);
-      const payTotal = payments.reduce((a, x) => a + Number(x.amount), 0);
+      const payTotal = fromPayments;
+      
+      const pendingSum = deliveries
+        .filter((x) => x.payment_mode === "pending")
+        .reduce((a, x) => a + Number(x.total_amount), 0);
+      const pending = Math.max(0, pendingSum - payTotal);
 
       generateReportPDF({
         title: `Monthly Business Report - ${mPreset.label}`,
@@ -180,7 +263,7 @@ function AdminBills() {
           sales,
           payments: payTotal,
           expenses: expTotal,
-          pending: 0,
+          pending,
           net: sales - expTotal,
         },
         deliveries,
@@ -208,8 +291,16 @@ function AdminBills() {
           .select("*, customers(name)")
           .gte("created_at", fromIso)
           .lte("created_at", toIso),
-        supabase.from("payments").select("*").gte("created_at", fromIso).lte("created_at", toIso),
-        supabase.from("expenses").select("*").gte("created_at", fromIso).lte("created_at", toIso),
+        supabase
+          .from("payments")
+          .select("*, customers(name)")
+          .gte("created_at", fromIso)
+          .lte("created_at", toIso),
+        supabase
+          .from("expenses")
+          .select("*")
+          .gte("created_at", fromIso)
+          .lte("created_at", toIso),
       ]);
 
       const deliveries = d.data ?? [];
@@ -217,9 +308,20 @@ function AdminBills() {
       const expenses = e.data ?? [];
 
       const bottles = deliveries.reduce((a, x) => a + x.bottles_delivered, 0);
-      const sales = deliveries.reduce((a, x) => a + Number(x.total_amount), 0);
+      
+      const fromDeliveries = deliveries
+        .filter((x) => x.payment_mode !== "pending")
+        .reduce((a, x) => a + Number(x.total_amount), 0);
+      const fromPayments = payments.reduce((a, x) => a + Number(x.amount), 0);
+      const sales = fromDeliveries + fromPayments;
+
       const expTotal = expenses.reduce((a, x) => a + Number(x.amount), 0);
-      const payTotal = payments.reduce((a, x) => a + Number(x.amount), 0);
+      const payTotal = fromPayments;
+
+      const pendingSum = deliveries
+        .filter((x) => x.payment_mode === "pending")
+        .reduce((a, x) => a + Number(x.total_amount), 0);
+      const pending = Math.max(0, pendingSum - payTotal);
 
       generateReportPDF({
         title: `Daily Operational Report - ${formatDate(dailyDate)}`,
@@ -231,7 +333,7 @@ function AdminBills() {
           sales,
           payments: payTotal,
           expenses: expTotal,
-          pending: 0,
+          pending,
           net: sales - expTotal,
         },
         deliveries,
@@ -480,36 +582,67 @@ function AdminBills() {
       </div>
 
       {/* Monthly and Daily Reports (Visible in UI, Hidden in Print) */}
-      <div className="print:hidden mt-8 grid md:grid-cols-2 gap-6">
+      <div className="print:hidden mt-8 space-y-6">
         {/* Monthly Reports */}
         <div className="card-surface p-5">
-          <h3 className="font-bold text-lg mb-1">Monthly Reports</h3>
-          <p className="text-xs text-muted-foreground mb-4">
-            Download comprehensive statement logs for past months.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {last6Months.map((m) => (
-              <button
-                key={m.label}
-                disabled={!!downloadingMonth}
-                onClick={() => handleDownloadMonth(m)}
-                className="p-3 text-left border border-border rounded-xl bg-muted/20 hover:bg-muted transition-colors flex items-center justify-between text-xs font-semibold disabled:opacity-50"
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+            <div>
+              <h3 className="font-bold text-lg mb-1">Monthly Reports</h3>
+              <p className="text-xs text-muted-foreground">
+                Download comprehensive statement logs for past months.
+              </p>
+            </div>
+            <div className="w-full sm:w-48">
+              <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">
+                Select Year
+              </label>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="w-full h-10 px-3 rounded-[10px] border border-border bg-background text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                <span>{m.label}</span>
-                <Download className="h-4 w-4 text-primary shrink-0" />
-              </button>
-            ))}
+                {availableYears.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
+
+          {availableMonthsQ.isLoading ? (
+            <div className="py-10 text-center text-xs text-muted-foreground animate-pulse">
+              Loading available months...
+            </div>
+          ) : activeMonthCards.length === 0 ? (
+            <div className="py-10 text-center text-xs text-muted-foreground italic">
+              No delivery data recorded for {selectedYear}.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {activeMonthCards.map((m) => (
+                <button
+                  key={m.label}
+                  disabled={!!downloadingMonth}
+                  onClick={() => handleDownloadMonth(m)}
+                  className="p-3 text-left border border-border rounded-xl bg-muted/20 hover:bg-muted transition-colors flex items-center justify-between text-xs font-semibold disabled:opacity-50"
+                >
+                  <span>{m.label}</span>
+                  <Download className="h-4 w-4 text-primary shrink-0" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Daily Reports */}
-        <div className="card-surface p-5 flex flex-col justify-between">
-          <div>
-            <h3 className="font-bold text-lg mb-1">Daily Operations</h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Generate and download single-day operational reports.
-            </p>
-            <div className="relative max-w-[200px]">
+        <div className="card-surface p-5">
+          <h3 className="font-bold text-lg mb-1">Daily Operations</h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            Generate and download single-day operational reports.
+          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="relative w-full sm:max-w-[200px]">
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 type="date"
@@ -518,15 +651,15 @@ function AdminBills() {
                 className="h-11 w-full pl-9 pr-3 rounded-[10px] border border-border bg-card text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
+            <button
+              disabled={downloadingDaily}
+              onClick={handleDownloadDaily}
+              className="h-11 px-6 rounded-[10px] bg-primary text-primary-foreground font-semibold inline-flex items-center justify-center gap-2 hover:opacity-95 disabled:opacity-50 w-full sm:w-auto"
+            >
+              <Download className="h-4 w-4" />{" "}
+              {downloadingDaily ? "Generating..." : "Download Daily PDF"}
+            </button>
           </div>
-          <button
-            disabled={downloadingDaily}
-            onClick={handleDownloadDaily}
-            className="mt-5 h-12 w-full rounded-[10px] bg-primary text-primary-foreground font-semibold inline-flex items-center justify-center gap-2 hover:opacity-95 disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" />{" "}
-            {downloadingDaily ? "Generating..." : "Download Daily PDF"}
-          </button>
         </div>
       </div>
 

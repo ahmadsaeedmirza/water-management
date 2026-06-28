@@ -69,12 +69,9 @@ function AdminExpenses() {
       </div>
 
       {list.length === 0 ? (
-        <div className="card-surface p-10 text-center">
-          <div className="h-14 w-14 mx-auto rounded-2xl bg-accent grid place-items-center">
-            <Receipt className="h-7 w-7 text-primary" />
-          </div>
-          <p className="mt-3 font-bold">No expenses logged</p>
-          <p className="text-sm text-muted-foreground">Expenses will appear as workers log them.</p>
+        <div className="flex flex-col items-center justify-center py-12 px-6 text-center bg-card rounded-xl border border-border space-y-3">
+          <Receipt className="h-12 w-12 text-[#90E0EF]" />
+          <p className="text-[#64748B] text-sm font-medium">No expenses logged for this period</p>
         </div>
       ) : (
         <div className="card-surface overflow-hidden">

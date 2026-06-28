@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminShell } from "@/components/admin-shell";
+import { useAuth } from "@/lib/auth";
 import { formatRs, formatDate, formatTime, relativeTime, initials } from "@/lib/format";
 import {
   Droplet,
@@ -17,6 +18,9 @@ import {
   Phone,
   MapPin,
   Plus,
+  Truck,
+  Receipt,
+  Users,
 } from "lucide-react";
 import {
   BarChart,
@@ -61,7 +65,7 @@ function AdminDashboard() {
       const { data, error } = await supabase
         .from("deliveries")
         .select(
-          "id, bottles_delivered, total_amount, payment_mode, created_at, customer_id, customers(name)",
+          "id, bottles_delivered, total_amount, payment_mode, created_at, customer_id, customer_type, customers(name)",
         )
         .gte("created_at", since)
         .order("created_at", { ascending: false });
@@ -137,12 +141,19 @@ function AdminDashboard() {
   const weekQ = useQuery({
     queryKey: ["adm-week"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("deliveries")
-        .select("bottles_delivered, total_amount, created_at")
-        .gte("created_at", weekStart.toISOString());
-      if (error) throw error;
-      return data ?? [];
+      const [d, p] = await Promise.all([
+        supabase
+          .from("deliveries")
+          .select("bottles_delivered, total_amount, payment_mode, created_at, customer_type")
+          .gte("created_at", weekStart.toISOString()),
+        supabase
+          .from("payments")
+          .select("amount, created_at")
+          .gte("created_at", weekStart.toISOString()),
+      ]);
+      if (d.error) throw d.error;
+      if (p.error) throw p.error;
+      return { deliveries: d.data ?? [], payments: p.data ?? [] };
     },
   });
 
@@ -153,19 +164,33 @@ function AdminDashboard() {
     queryFn: async () => {
       const start = new Date(selectedDate + "T00:00:00").toISOString();
       const end = new Date(selectedDate + "T23:59:59").toISOString();
-      const [lots, deliveries, expenses] = await Promise.all([
-        supabase.from("lots").select("*").gte("created_at", start).lte("created_at", end),
+      const [lots, deliveries, expenses, payments] = await Promise.all([
+        supabase
+          .from("lots")
+          .select("*")
+          .gte("created_at", start)
+          .lte("created_at", end),
         supabase
           .from("deliveries")
           .select("*, customers(name)")
           .gte("created_at", start)
           .lte("created_at", end),
-        supabase.from("expenses").select("*").gte("created_at", start).lte("created_at", end),
+        supabase
+          .from("expenses")
+          .select("*")
+          .gte("created_at", start)
+          .lte("created_at", end),
+        supabase
+          .from("payments")
+          .select("*, customers(name)")
+          .gte("created_at", start)
+          .lte("created_at", end),
       ]);
       return {
         lots: lots.data ?? [],
         deliveries: deliveries.data ?? [],
         expenses: expenses.data ?? [],
+        payments: payments.data ?? [],
       };
     },
   });
@@ -187,6 +212,7 @@ function AdminDashboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "payments" }, () => {
         qc.invalidateQueries({ queryKey: ["adm-payments"] });
         qc.invalidateQueries({ queryKey: ["adm-customers-summary"] });
+        if (selectedDate) qc.invalidateQueries({ queryKey: ["breakdown", selectedDate] });
       })
       .subscribe();
     return () => {
@@ -196,9 +222,25 @@ function AdminDashboard() {
 
   const deliveries = deliveriesQ.data ?? [];
   const bottles = deliveries.reduce((a, d) => a + d.bottles_delivered, 0);
-  const sales = deliveries.reduce((a, d) => a + Number(d.total_amount), 0);
+
+  // Walk-in Revenue = SUM(deliveries where customer_type = 'walkin' AND payment_mode != 'pending')
+  const walkinRev = deliveries
+    .filter((d) => d.customer_type === "walkin" && d.payment_mode !== "pending")
+    .reduce((a, d) => a + Number(d.total_amount), 0);
+
+  // Regular Customer Collected Revenue = SUM(payments)
+  const regularCollected = (paymentsQ.data ?? []).reduce((a, p) => a + Number(p.amount), 0);
+
+  // Total Revenue = Walk-in Revenue + Regular Customer Collected Revenue
+  const sales = walkinRev + regularCollected;
   const expenses = (expensesQ.data ?? []).reduce((a, e) => a + Number(e.amount), 0);
   const net = sales - expenses;
+
+  // Pending Collection = SUM(deliveries where customer_type = 'regular' AND payment_mode = 'pending') - SUM(payments)
+  const regPendingBilled = deliveries
+    .filter((d) => d.customer_type === "regular" && d.payment_mode === "pending")
+    .reduce((a, d) => a + Number(d.total_amount), 0);
+  const pendingCollection = Math.max(0, regPendingBilled - regularCollected);
 
   const chartData = useMemo(() => {
     const days: { label: string; date: string; bottles: number; sales: number }[] = [];
@@ -212,12 +254,22 @@ function AdminDashboard() {
         sales: 0,
       });
     }
-    for (const row of weekQ.data ?? []) {
+    const data = weekQ.data ?? { deliveries: [], payments: [] };
+    for (const row of data.deliveries) {
       const key = new Date(row.created_at).toISOString().slice(0, 10);
       const cell = days.find((x) => x.date === key);
       if (cell) {
         cell.bottles += row.bottles_delivered;
-        cell.sales += Number(row.total_amount);
+        if (row.customer_type === "walkin" && row.payment_mode !== "pending") {
+          cell.sales += Number(row.total_amount);
+        }
+      }
+    }
+    for (const row of data.payments) {
+      const key = new Date(row.created_at).toISOString().slice(0, 10);
+      const cell = days.find((x) => x.date === key);
+      if (cell) {
+        cell.sales += Number(row.amount);
       }
     }
     return days;
@@ -283,6 +335,17 @@ function AdminDashboard() {
           value={formatRs(net)}
           negative={net < 0}
         />
+      </div>
+
+      <div className="flex flex-wrap gap-2 mt-3 text-xs font-semibold text-muted-foreground">
+        <span className="px-3 py-1.5 rounded-lg bg-muted/60 border border-border flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+          Walk-in Revenue: <span className="text-foreground">{formatRs(walkinRev)}</span>
+        </span>
+        <span className="px-3 py-1.5 rounded-lg bg-muted/60 border border-border flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-warning" />
+          Pending Collection: <span className="text-foreground">{formatRs(pendingCollection)}</span>
+        </span>
       </div>
 
       <div className="card-surface p-5 mt-5">
@@ -371,8 +434,9 @@ function AdminDashboard() {
             <h3 className="font-bold">Recent Deliveries</h3>
           </div>
           {deliveries.length === 0 ? (
-            <div className="px-5 py-10 text-center text-sm text-muted-foreground">
-              No deliveries in this range yet.
+            <div className="flex flex-col items-center justify-center py-12 px-6 text-center space-y-3">
+              <Truck className="h-12 w-12 text-[#90E0EF]" />
+              <p className="text-[#64748B] text-sm font-medium">No deliveries today</p>
             </div>
           ) : (
             <ul className="divide-y divide-border">
@@ -412,8 +476,9 @@ function AdminDashboard() {
               Loading...
             </div>
           ) : (recentExpensesQ.data ?? []).length === 0 ? (
-            <div className="px-5 py-10 text-center text-sm text-muted-foreground">
-              No expenses logged yet.
+            <div className="flex flex-col items-center justify-center py-12 px-6 text-center space-y-3">
+              <Receipt className="h-12 w-12 text-[#90E0EF]" />
+              <p className="text-[#64748B] text-sm font-medium">No expenses today</p>
             </div>
           ) : (
             <ul className="divide-y divide-border">
@@ -447,8 +512,9 @@ function AdminDashboard() {
             Loading customers summary...
           </div>
         ) : (customersSummaryQ.data ?? []).length === 0 ? (
-          <div className="p-5 text-center text-sm text-muted-foreground">
-            No regular customers registered.
+          <div className="flex flex-col items-center justify-center py-12 px-6 text-center space-y-3">
+            <Users className="h-12 w-12 text-[#90E0EF]" />
+            <p className="text-[#64748B] text-sm font-medium">No regular customers yet</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -470,9 +536,9 @@ function AdminDashboard() {
                     .filter((d: any) => new Date(d.created_at) >= startOfMonth)
                     .reduce((sum: number, d: any) => sum + d.bottles_delivered, 0);
 
-                  const dues = (c.deliveries ?? [])
-                    .filter((d: any) => d.payment_mode === "pending")
-                    .reduce((a: number, d: any) => a + Number(d.total_amount), 0);
+                  const pendingSum = (c.deliveries ?? []).filter((d: any) => d.payment_mode === "pending").reduce((a: number, d: any) => a + Number(d.total_amount), 0);
+                  const paymentsSum = (c.payments ?? []).reduce((a: number, p: any) => a + Number(p.amount), 0);
+                  const dues = pendingSum - paymentsSum;
 
                   const lastDel = (c.deliveries ?? []).sort(
                     (a: any, b: any) => +new Date(b.created_at) - +new Date(a.created_at),
@@ -495,7 +561,7 @@ function AdminDashboard() {
                             dues > 0 ? "bg-warning/15 text-warning" : "bg-success/15 text-success"
                           }`}
                         >
-                          {formatRs(dues)}
+                          {dues < 0 ? "Overpaid" : dues === 0 ? "Cleared" : formatRs(dues)}
                         </span>
                       </td>
                       <td className="p-4 text-muted-foreground">{lastDelDate}</td>
@@ -541,10 +607,17 @@ function AdminDashboard() {
                     </p>
                     <p className="text-lg font-bold tabular-nums text-success">
                       {formatRs(
-                        (breakdownQ.data?.deliveries ?? []).reduce(
-                          (a: number, d: any) => a + Number(d.total_amount),
-                          0,
-                        ),
+                        (breakdownQ.data?.deliveries ?? [])
+                          .filter(
+                            (d: any) =>
+                              d.customer_type === "walkin" &&
+                              d.payment_mode !== "pending",
+                          )
+                          .reduce((a: number, d: any) => a + Number(d.total_amount), 0) +
+                          (breakdownQ.data?.payments ?? []).reduce(
+                            (a: number, p: any) => a + Number(p.amount),
+                            0,
+                          ),
                       )}
                     </p>
                   </div>
@@ -622,6 +695,39 @@ function AdminDashboard() {
                               {d.payment_mode}
                             </span>
                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Payments Received section */}
+                <div>
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-2">
+                    Payments Received
+                  </h4>
+                  {(breakdownQ.data?.payments ?? []).length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2 italic">
+                      No payments recorded.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {(breakdownQ.data?.payments ?? []).map((p: any) => (
+                        <div
+                          key={p.id}
+                          className="card-surface p-3 text-xs flex justify-between items-center"
+                        >
+                          <div>
+                            <p className="font-semibold">
+                              {p.customers?.name || "Regular Customer"}
+                            </p>
+                            <p className="text-muted-foreground mt-0.5">
+                              {formatTime(p.created_at)}
+                            </p>
+                          </div>
+                          <span className="font-bold text-success tabular-nums">
+                            {formatRs(p.amount)}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -709,15 +815,13 @@ function LedgerDrawer({ customer, onClose }: { customer: any; onClose: () => voi
   const [mode, setMode] = useState<"cash" | "card" | "online">("cash");
   const [activeTab, setActiveTab] = useState<"deliveries" | "payments">("deliveries");
 
-  const totalBilled = (customer.deliveries ?? []).reduce(
-    (a: number, d: any) => a + Number(d.total_amount),
+  const totalBilled = (customer.deliveries ?? [])
+    .filter((d: any) => d.payment_mode === "pending")
+    .reduce((a: number, d: any) => a + Number(d.total_amount), 0);
+  const totalPaid = (customer.payments ?? []).reduce(
+    (a: number, p: any) => a + Number(p.amount),
     0,
   );
-  const totalPaid =
-    (customer.payments ?? []).reduce((a: number, p: any) => a + Number(p.amount), 0) +
-    (customer.deliveries ?? [])
-      .filter((d: any) => d.payment_mode !== "pending")
-      .reduce((a: number, d: any) => a + Number(d.total_amount), 0);
   const balance = totalBilled - totalPaid;
 
   const deliveriesList = useMemo(() => {
@@ -800,11 +904,11 @@ function LedgerDrawer({ customer, onClose }: { customer: any; onClose: () => voi
             </div>
           )}
           <div className="grid grid-cols-3 gap-2 pt-2">
-            <Stat label="Billed" value={formatRs(totalBilled)} />
-            <Stat label="Paid" value={formatRs(totalPaid)} tone="success" />
+            <Stat label="Pending Dues" value={formatRs(totalBilled)} />
+            <Stat label="Payments" value={formatRs(totalPaid)} tone="success" />
             <Stat
-              label="Balance"
-              value={formatRs(balance)}
+              label="Balance Due"
+              value={balance < 0 ? "Overpaid" : balance === 0 ? "Rs. 0" : formatRs(balance)}
               tone={balance > 0 ? "warning" : "success"}
             />
           </div>
@@ -830,8 +934,9 @@ function LedgerDrawer({ customer, onClose }: { customer: any; onClose: () => voi
         <div className="flex-1 overflow-y-auto">
           {activeTab === "deliveries" ? (
             deliveriesList.length === 0 ? (
-              <div className="p-10 text-center text-sm text-muted-foreground">
-                No deliveries yet.
+              <div className="flex flex-col items-center justify-center py-12 px-6 text-center space-y-3">
+                <Truck className="h-12 w-12 text-[#90E0EF]" />
+                <p className="text-[#64748B] text-sm font-medium">No deliveries recorded yet</p>
               </div>
             ) : (
               <ul className="divide-y divide-border">
@@ -858,8 +963,9 @@ function LedgerDrawer({ customer, onClose }: { customer: any; onClose: () => voi
               </ul>
             )
           ) : paymentsList.length === 0 ? (
-            <div className="p-10 text-center text-sm text-muted-foreground">
-              No payments received yet.
+            <div className="flex flex-col items-center justify-center py-12 px-6 text-center space-y-3">
+              <CreditCard className="h-12 w-12 text-[#90E0EF]" />
+              <p className="text-[#64748B] text-sm font-medium">No payments recorded yet</p>
             </div>
           ) : (
             <ul className="divide-y divide-border">

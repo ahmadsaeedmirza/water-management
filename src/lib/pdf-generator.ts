@@ -97,8 +97,134 @@ export function generateReportPDF(data: PDFReportData) {
 
   let currentY = 70;
 
+  // Walk-in vs Regular sales calculations
+  const walkinSales = data.deliveries.filter((d) => d.customer_type === "walkin" && d.payment_mode !== "pending");
+  const walkinBottles = walkinSales.reduce((a, d) => a + d.bottles_delivered, 0);
+  const walkinAmt = walkinSales.reduce((a, d) => a + Number(d.total_amount), 0);
+
+  const regPending = data.deliveries.filter(
+    (d) => d.customer_type === "regular" && d.payment_mode === "pending",
+  );
+  const regPendBottles = regPending.reduce((a, d) => a + d.bottles_delivered, 0);
+  const regPendAmt = regPending.reduce((a, d) => a + Number(d.total_amount), 0);
+
+  const paymentsTotal = data.payments.reduce((a, p) => a + Number(p.amount), 0);
+  const totalRevenueCollected = walkinAmt + paymentsTotal;
+  const totalPending = Math.max(0, regPendAmt - paymentsTotal);
+
+  // Sales & Revenue Breakdown Summary
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(51, 65, 85);
+  doc.text("Sales & Revenue Breakdown Summary", 14, currentY);
+  currentY += 4;
+
+  autoTable(doc, {
+    startY: currentY,
+    head: [["Revenue Category", "Bottles Delivered", "Amount (Rs.)"]],
+    body: [
+      ["Walk-in Customer Revenue", `${walkinBottles} bottles`, formatRs(walkinAmt)],
+      ["Regular Customer Collected Revenue (Payments)", "-", formatRs(paymentsTotal)],
+      ["Total Revenue Collected", "-", formatRs(totalRevenueCollected)],
+      ["Regular Customer Pending Billed Dues", `${regPendBottles} bottles`, formatRs(regPendAmt)],
+      ["Total Pending Collection", "-", formatRs(totalPending)],
+    ],
+    theme: "grid",
+    headStyles: { fillColor: [51, 65, 85], fontSize: 9 },
+    bodyStyles: { fontSize: 8, textColor: textColor },
+    margin: { left: 14, right: 14 },
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY + 10;
+
+  // Per-Customer Ledger Summary (for Business Reports)
+  if (data.customerId === "all" && !data.title.includes("Daily")) {
+    const customerMap: Record<
+      string,
+      {
+        name: string;
+        bottles: number;
+        pendingBilled: number;
+        paymentsReceived: number;
+      }
+    > = {};
+
+    for (const d of data.deliveries) {
+      if (d.customer_type === "regular" && d.customer_id) {
+        const cId = d.customer_id;
+        const cName = d.customers?.name || "Regular Customer";
+        if (!customerMap[cId]) {
+          customerMap[cId] = { name: cName, bottles: 0, pendingBilled: 0, paymentsReceived: 0 };
+        }
+        customerMap[cId].bottles += d.bottles_delivered;
+        if (d.payment_mode === "pending") {
+          customerMap[cId].pendingBilled += Number(d.total_amount);
+        }
+      }
+    }
+
+    for (const p of data.payments) {
+      if (p.customer_id) {
+        const cId = p.customer_id;
+        const cName = p.customers?.name || "Regular Customer";
+        if (!customerMap[cId]) {
+          customerMap[cId] = { name: cName, bottles: 0, pendingBilled: 0, paymentsReceived: 0 };
+        }
+        customerMap[cId].paymentsReceived += Number(p.amount);
+      }
+    }
+
+    const customerRows = Object.values(customerMap);
+    if (customerRows.length > 0) {
+      if (currentY > 220) {
+        doc.addPage();
+        currentY = 20;
+      }
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(51, 65, 85);
+      doc.text("Per-Customer Ledger Summary (Regular Customers)", 14, currentY);
+      currentY += 4;
+
+      const body = customerRows.map((c) => {
+        const closingBal = c.pendingBilled - c.paymentsReceived;
+        return [
+          c.name,
+          `${c.bottles} bottles`,
+          formatRs(c.pendingBilled),
+          formatRs(c.paymentsReceived),
+          closingBal < 0 ? "Overpaid" : closingBal === 0 ? "Rs. 0" : formatRs(closingBal),
+        ];
+      });
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [
+          [
+            "Customer Name",
+            "Bottles Delivered",
+            "Pending Billed",
+            "Payments Received",
+            "Closing Balance",
+          ],
+        ],
+        body: body,
+        theme: "striped",
+        headStyles: { fillColor: primaryColor, fontSize: 9 },
+        bodyStyles: { fontSize: 8, textColor: textColor },
+        margin: { left: 14, right: 14 },
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 10;
+    }
+  }
+
   // Deliveries Table
   if (data.deliveries.length > 0) {
+    if (currentY > 240) {
+      doc.addPage();
+      currentY = 20;
+    }
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     doc.setTextColor(51, 65, 85);

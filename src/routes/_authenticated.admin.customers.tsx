@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { AdminShell } from "@/components/admin-shell";
 import { formatRs, formatDate, formatTime, initials } from "@/lib/format";
-import { Search, Plus, X, Banknote, CreditCard, Globe, Phone, MapPin } from "lucide-react";
+import { Search, Plus, X, Banknote, CreditCard, Globe, Phone, MapPin, Users, Truck } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin/customers")({
@@ -58,9 +58,14 @@ function AdminCustomers() {
   const opened = customers.find((c: any) => c.id === openId);
 
   const totalDues = customers.reduce((sum: number, c: any) => {
-    const dues = (c.deliveries ?? [])
+    const pendingSum = (c.deliveries ?? [])
       .filter((d: any) => d.payment_mode === "pending")
       .reduce((a: number, d: any) => a + Number(d.total_amount), 0);
+    const paymentsSum = (c.payments ?? []).reduce(
+      (a: number, p: any) => a + Number(p.amount),
+      0,
+    );
+    const dues = Math.max(0, pendingSum - paymentsSum);
     return sum + dues;
   }, 0);
 
@@ -88,15 +93,21 @@ function AdminCustomers() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="card-surface p-10 text-center text-sm text-muted-foreground">
-          No customers match.
+        <div className="flex flex-col items-center justify-center py-12 px-6 text-center bg-card rounded-xl border border-border space-y-3">
+          <Users className="h-12 w-12 text-[#90E0EF]" />
+          <p className="text-[#64748B] text-sm font-medium">No customers found</p>
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map((c: any) => {
-            const dues = (c.deliveries ?? [])
+            const pendingSum = (c.deliveries ?? [])
               .filter((d: any) => d.payment_mode === "pending")
               .reduce((a: number, d: any) => a + Number(d.total_amount), 0);
+            const paymentsSum = (c.payments ?? []).reduce(
+              (a: number, p: any) => a + Number(p.amount),
+              0,
+            );
+            const dues = pendingSum - paymentsSum;
             const bottles = (c.deliveries ?? []).reduce(
               (a: number, d: any) => a + d.bottles_delivered,
               0,
@@ -136,9 +147,9 @@ function AdminCustomers() {
                       Dues
                     </p>
                     <p
-                      className={`font-bold tabular-nums ${dues > 0 ? "text-warning" : "text-success"}`}
+                      className={`font-bold tabular-nums text-xs ${dues > 0 ? "text-warning" : "text-success"}`}
                     >
-                      {formatRs(dues)}
+                      {dues < 0 ? "Overpaid" : dues === 0 ? "Rs. 0" : formatRs(dues)}
                     </p>
                   </div>
                 </div>
@@ -167,15 +178,13 @@ function LedgerDrawer({ customer, onClose }: { customer: any; onClose: () => voi
   const [mode, setMode] = useState<"cash" | "card" | "online">("cash");
   const [activeTab, setActiveTab] = useState<"deliveries" | "payments">("deliveries");
 
-  const totalBilled = (customer.deliveries ?? []).reduce(
-    (a: number, d: any) => a + Number(d.total_amount),
+  const totalBilled = (customer.deliveries ?? [])
+    .filter((d: any) => d.payment_mode === "pending")
+    .reduce((a: number, d: any) => a + Number(d.total_amount), 0);
+  const totalPaid = (customer.payments ?? []).reduce(
+    (a: number, p: any) => a + Number(p.amount),
     0,
   );
-  const totalPaid =
-    (customer.payments ?? []).reduce((a: number, p: any) => a + Number(p.amount), 0) +
-    (customer.deliveries ?? [])
-      .filter((d: any) => d.payment_mode !== "pending")
-      .reduce((a: number, d: any) => a + Number(d.total_amount), 0);
   const balance = totalBilled - totalPaid;
 
   const deliveriesList = useMemo(() => {
@@ -258,11 +267,11 @@ function LedgerDrawer({ customer, onClose }: { customer: any; onClose: () => voi
             </div>
           )}
           <div className="grid grid-cols-3 gap-2 pt-2">
-            <Stat label="Billed" value={formatRs(totalBilled)} />
-            <Stat label="Paid" value={formatRs(totalPaid)} tone="success" />
+            <Stat label="Pending Dues" value={formatRs(totalBilled)} />
+            <Stat label="Payments" value={formatRs(totalPaid)} tone="success" />
             <Stat
-              label="Balance"
-              value={formatRs(balance)}
+              label="Balance Due"
+              value={balance < 0 ? "Overpaid" : balance === 0 ? "Rs. 0" : formatRs(balance)}
               tone={balance > 0 ? "warning" : "success"}
             />
           </div>
@@ -288,8 +297,9 @@ function LedgerDrawer({ customer, onClose }: { customer: any; onClose: () => voi
         <div className="flex-1 overflow-y-auto">
           {activeTab === "deliveries" ? (
             deliveriesList.length === 0 ? (
-              <div className="p-10 text-center text-sm text-muted-foreground">
-                No deliveries yet.
+              <div className="flex flex-col items-center justify-center py-12 px-6 text-center space-y-3">
+                <Truck className="h-12 w-12 text-[#90E0EF]" />
+                <p className="text-[#64748B] text-sm font-medium">No deliveries recorded yet</p>
               </div>
             ) : (
               <ul className="divide-y divide-border">
@@ -316,8 +326,9 @@ function LedgerDrawer({ customer, onClose }: { customer: any; onClose: () => voi
               </ul>
             )
           ) : paymentsList.length === 0 ? (
-            <div className="p-10 text-center text-sm text-muted-foreground">
-              No payments received yet.
+            <div className="flex flex-col items-center justify-center py-12 px-6 text-center space-y-3">
+              <CreditCard className="h-12 w-12 text-[#90E0EF]" />
+              <p className="text-[#64748B] text-sm font-medium">No payments recorded yet</p>
             </div>
           ) : (
             <ul className="divide-y divide-border">

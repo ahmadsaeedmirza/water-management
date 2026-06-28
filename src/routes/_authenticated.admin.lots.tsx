@@ -163,12 +163,9 @@ function AdminLots() {
 
 function Empty() {
   return (
-    <div className="card-surface p-10 text-center">
-      <div className="h-14 w-14 mx-auto rounded-2xl bg-accent grid place-items-center">
-        <PackageOpen className="h-7 w-7 text-primary" />
-      </div>
-      <h3 className="mt-3 font-bold">No lots found</h3>
-      <p className="text-sm text-muted-foreground mt-1">No lots were loaded on this date.</p>
+    <div className="flex flex-col items-center justify-center py-12 px-6 text-center bg-card rounded-xl border border-border space-y-3">
+      <PackageOpen className="h-12 w-12 text-[#90E0EF]" />
+      <p className="text-[#64748B] text-sm font-medium">No lots found for this date</p>
     </div>
   );
 }

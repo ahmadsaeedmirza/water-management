@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Minus,
@@ -32,12 +32,14 @@ function DeliveriesPage() {
   const { user, name } = useAuth();
   const qc = useQueryClient();
   const search = Route.useSearch();
+  const navigate = useNavigate();
 
   const [customerType, setCustomerType] = useState<"walkin" | "regular">(
     search.customer_id ? "regular" : "walkin",
   );
   const [customerId, setCustomerId] = useState<string | undefined>(search.customer_id);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [closeSheetOpen, setCloseSheetOpen] = useState(false);
   const [qty, setQty] = useState<number>(1);
   const [price, setPrice] = useState("25");
   const [mode, setMode] = useState<Mode>("cash");
@@ -51,7 +53,7 @@ function DeliveriesPage() {
       if (search.lotId) {
         const { data, error } = await supabase
           .from("lots")
-          .select("*, deliveries(bottles_delivered)")
+          .select("*, deliveries(bottles_delivered, total_amount, payment_mode)")
           .eq("id", search.lotId)
           .maybeSingle();
         if (error) throw error;
@@ -59,7 +61,7 @@ function DeliveriesPage() {
       } else {
         const { data, error } = await supabase
           .from("lots")
-          .select("*, deliveries(bottles_delivered)")
+          .select("*, deliveries(bottles_delivered, total_amount, payment_mode)")
           .eq("worker_id", user!.id)
           .eq("status", "active")
           .order("created_at", { ascending: false })
@@ -99,10 +101,11 @@ function DeliveriesPage() {
   const taken = lot?.total_bottles ?? 0;
   const sold = lot?.deliveries?.reduce((a: number, d: any) => a + d.bottles_delivered, 0) ?? 0;
   const stock = taken - sold;
-  const selectedCustomer = useMemo(
-    () => (customersQ.data ?? []).find((c) => c.id === customerId),
-    [customerId, customersQ.data],
-  );
+  
+  const selectedCustomer = useMemo(() => {
+    return (customersQ.data ?? []).find((c) => c.id === customerId);
+  }, [customersQ.data, customerId]);
+
   const unitPrice = parseFloat(price) || 0;
   const total = qty * unitPrice;
 
@@ -128,13 +131,7 @@ function DeliveriesPage() {
         payment_mode: mode,
       });
       if (error) throw error;
-      // auto-complete lot if stock=0
-      if (qty >= stock) {
-        await supabase
-          .from("lots")
-          .update({ status: "completed", completed_at: new Date().toISOString() })
-          .eq("id", lot.id);
-      }
+
       const { data: admins } = await supabase
         .from("user_roles")
         .select("user_id")
@@ -143,6 +140,7 @@ function DeliveriesPage() {
         await supabase.from("notifications").insert(
           admins.map((a) => ({
             user_id: a.user_id,
+            worker_id: user!.id,
             kind: "delivery",
             message: `${name || "Worker"} delivered ${qty} bottle${qty > 1 ? "s" : ""} · ${formatRs(total)} · ${mode}`,
           })),
@@ -160,6 +158,7 @@ function DeliveriesPage() {
       // self confirmation
       await supabase.from("notifications").insert({
         user_id: user!.id,
+        worker_id: user!.id,
         kind: "delivery_self",
         message: `Delivery recorded — ${qty} bottle${qty > 1 ? "s" : ""} · ${formatRs(total)} · ${mode}`,
       });
@@ -173,6 +172,24 @@ function DeliveriesPage() {
       if (customerType === "walkin") setMode("cash");
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to record delivery"),
+  });
+
+  const closeMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("lots")
+        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .eq("id", lot!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Lot completed successfully");
+      qc.invalidateQueries({ queryKey: ["active-lot"] });
+      qc.invalidateQueries({ queryKey: ["lots"] });
+      setCloseSheetOpen(false);
+      navigate({ to: "/worker/dashboard" });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to close lot"),
   });
 
   const handleRecord = () => {
@@ -219,22 +236,39 @@ function DeliveriesPage() {
         {activeLotQ.isLoading ? (
           <div className="h-24 rounded-xl bg-muted animate-pulse" />
         ) : !lot ? (
-          <div className="card-surface p-6 text-center">
-            <Truck className="h-10 w-10 text-muted-foreground mx-auto" />
-            <p className="mt-3 font-semibold">No active lot</p>
-            <p className="text-sm text-muted-foreground">Start a new lot from the home screen.</p>
+          <div className="flex flex-col items-center justify-center py-12 px-6 text-center bg-card rounded-xl border border-border space-y-4">
+            <Truck className="h-12 w-12 text-[#90E0EF]" />
+            <p className="text-[#64748B] text-sm font-medium">
+              No active lot. Go to Home to start a new lot.
+            </p>
+            <Link
+              to="/worker/dashboard"
+              className="h-11 px-6 rounded-lg bg-primary text-primary-foreground font-semibold flex items-center justify-center text-sm hover:opacity-90 transition-opacity w-full sm:w-auto"
+            >
+              Go to Home
+            </Link>
           </div>
         ) : (
           <>
             <div className="card-surface p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-11 w-11 rounded-xl bg-accent grid place-items-center">
-                  <Truck className="h-5 w-5 text-primary" />
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-11 w-11 rounded-xl bg-accent grid place-items-center">
+                    <Truck className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Active Lot</p>
+                    <p className="font-bold">#{lot.id.slice(0, 6).toUpperCase()}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Active Lot</p>
-                  <p className="font-bold">#{lot.id.slice(0, 6).toUpperCase()}</p>
-                </div>
+                {lot.status === "active" && (
+                  <button
+                    onClick={() => setCloseSheetOpen(true)}
+                    className="h-8 px-3 rounded-lg border border-destructive/20 bg-destructive/10 text-destructive text-xs font-semibold hover:bg-destructive/15 transition-colors"
+                  >
+                    Close Lot
+                  </button>
+                )}
               </div>
               <div className="mt-3 grid grid-cols-3 divide-x divide-border text-center">
                 <div>
@@ -417,7 +451,88 @@ function DeliveriesPage() {
           </div>
         </div>
       )}
+
+      {closeSheetOpen && lot && (
+        <CloseLotSheet
+          lot={lot}
+          sold={sold}
+          onClose={() => setCloseSheetOpen(false)}
+          onConfirm={() => closeMutation.mutate()}
+          loading={closeMutation.isPending}
+        />
+      )}
     </WorkerShell>
+  );
+}
+
+function CloseLotSheet({
+  lot,
+  sold,
+  onClose,
+  onConfirm,
+  loading,
+}: {
+  lot: any;
+  sold: number;
+  onClose: () => void;
+  onConfirm: () => void;
+  loading: boolean;
+}) {
+  const deliveries = lot.deliveries ?? [];
+  const revCollected = deliveries
+    .filter((d: any) => d.payment_mode !== "pending")
+    .reduce((sum: number, d: any) => sum + Number(d.total_amount), 0);
+  const pendCollected = deliveries
+    .filter((d: any) => d.payment_mode === "pending")
+    .reduce((sum: number, d: any) => sum + Number(d.total_amount), 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-x-0 bottom-0 bg-card rounded-t-[20px] mx-auto max-w-[390px] p-6 animate-in slide-in-from-bottom duration-200 space-y-4">
+        <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-border" />
+        <h2 className="text-xl font-bold text-center">
+          Lot #{lot.id.slice(0, 6).toUpperCase()} Summary
+        </h2>
+        
+        <div className="card-surface p-4 divide-y divide-border text-sm">
+          <div className="py-2 flex justify-between">
+            <span className="text-muted-foreground">Went out with</span>
+            <span className="font-bold">{lot.total_bottles} bottles</span>
+          </div>
+          <div className="py-2 flex justify-between">
+            <span className="text-muted-foreground">Delivered</span>
+            <span className="font-bold text-success">{sold} bottles</span>
+          </div>
+          <div className="py-2 flex justify-between">
+            <span className="text-muted-foreground">Remaining</span>
+            <span className="font-bold text-warning">{lot.total_bottles - sold} bottles</span>
+          </div>
+          <div className="py-2 flex justify-between">
+            <span className="text-muted-foreground">Revenue collected</span>
+            <span className="font-bold text-primary">{formatRs(revCollected)}</span>
+          </div>
+          <div className="py-2 flex justify-between">
+            <span className="text-muted-foreground">Pending collection</span>
+            <span className="font-bold text-warning">{formatRs(pendCollected)}</span>
+          </div>
+        </div>
+
+        <button
+          onClick={onConfirm}
+          disabled={loading}
+          className="h-12 w-full rounded-[10px] bg-primary text-primary-foreground font-bold hover:bg-primary/90 disabled:opacity-50"
+        >
+          {loading ? "Closing..." : "Confirm & Close Lot"}
+        </button>
+        <button
+          onClick={onClose}
+          className="w-full text-center text-sm font-semibold text-muted-foreground py-2 hover:text-foreground"
+        >
+          Go Back
+        </button>
+      </div>
+    </div>
   );
 }
 
