@@ -45,7 +45,7 @@ export function WorkerShell({ children }: { children: ReactNode }) {
           </div>
         </nav>
       </div>
-      <footer className="w-full h-9 bg-[#0F172A] flex items-center justify-center text-xs text-[#64748B] text-center fixed bottom-0 left-0 right-0 z-50">
+      <footer className="w-full h-9 flex items-center justify-center text-xs text-[#64748B] text-center fixed bottom-0 left-0 right-0 z-50">
         <span>
           © Shifaf Aab · Powered by{" "}
           <a
