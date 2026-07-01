@@ -159,11 +159,16 @@ function AdminCustomers() {
                     {initials(c.name)}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-start justify-between gap-2">
                       <p className="font-bold text-sm truncate">{c.name}</p>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F8FAFC] text-[#0077B6] border border-[#0077B6] shrink-0">
-                        Route {c.route || "A"}
-                      </span>
+                      <div className="flex flex-col items-end shrink-0">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F8FAFC] text-[#0077B6] border border-[#0077B6]">
+                          Route {c.route || "A"}
+                        </span>
+                        <span className="text-[#64748B] text-sm mt-1">
+                          🫙 {c.empty_bottles ?? 0} empty bottles
+                        </span>
+                      </div>
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {c.phone || "No phone"}
@@ -337,6 +342,9 @@ function LedgerDrawer({ customer, onClose }: { customer: any; onClose: () => voi
               <h2 className="font-bold truncate">{customer.name}</h2>
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F8FAFC] text-[#0077B6] border border-[#0077B6] shrink-0">
                 Route {customer.route || "A"}
+              </span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F8FAFC] text-[#0077B6] border border-[#0077B6] shrink-0">
+                Empty Bottles: {customer.empty_bottles ?? 0}
               </span>
             </div>
             <p className="text-xs text-muted-foreground truncate">
@@ -548,10 +556,12 @@ function AddCustomerDrawer({
   const [address, setAddress] = useState(customer?.address ?? "");
   const [price, setPrice] = useState(customer ? String(customer.price_per_bottle) : "25");
   const [route, setRoute] = useState<"A" | "B">(customer?.route ?? "A");
+  const [emptyBottles, setEmptyBottles] = useState(customer ? String(customer.empty_bottles ?? 0) : "0");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const m = useMutation({
     mutationFn: async () => {
+      const eb = parseInt(emptyBottles) || 0;
       if (customer) {
         const { error } = await supabase
           .from("customers")
@@ -561,6 +571,7 @@ function AddCustomerDrawer({
             address: address.trim(),
             price_per_bottle: parseFloat(price) || 0,
             route,
+            empty_bottles: eb,
           })
           .eq("id", customer.id);
         if (error) throw error;
@@ -571,6 +582,7 @@ function AddCustomerDrawer({
           address: address.trim(),
           price_per_bottle: parseFloat(price) || 0,
           route,
+          empty_bottles: eb,
         });
         if (error) throw error;
       }
@@ -594,6 +606,10 @@ function AddCustomerDrawer({
     }
     if (!address.trim()) {
       newErrors.address = "Address is required";
+    }
+    const eb = parseInt(emptyBottles);
+    if (emptyBottles.trim() === "" || isNaN(eb) || eb < 0) {
+      newErrors.emptyBottles = "Empty bottles must be 0 or a positive integer";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -669,6 +685,18 @@ function AddCustomerDrawer({
               Route B
             </button>
           </div>
+        </Field>
+
+        <Field label="Empty Bottles at Customer" error={errors.emptyBottles}>
+          <input
+            type="number"
+            value={emptyBottles}
+            onChange={(e) => {
+              setEmptyBottles(e.target.value);
+              setErrors((errs) => ({ ...errs, emptyBottles: "" }));
+            }}
+            className="input tabular-nums"
+          />
         </Field>
 
         <Field label="Price per bottle" error={errors.price}>

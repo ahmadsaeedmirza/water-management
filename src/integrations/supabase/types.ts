@@ -12,6 +12,7 @@ export type Database = {
         Row: {
           address: string;
           created_at: string;
+          empty_bottles: number;
           id: string;
           name: string;
           phone: string | null;
@@ -21,6 +22,7 @@ export type Database = {
         Insert: {
           address?: string;
           created_at?: string;
+          empty_bottles?: number;
           id?: string;
           name: string;
           phone?: string | null;
@@ -30,6 +32,7 @@ export type Database = {
         Update: {
           address?: string;
           created_at?: string;
+          empty_bottles?: number;
           id?: string;
           name?: string;
           phone?: string | null;

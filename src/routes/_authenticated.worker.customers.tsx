@@ -349,6 +349,9 @@ function LedgerDrawer({ customer, onClose }: { customer: any; onClose: () => voi
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F8FAFC] text-[#0077B6] border border-[#0077B6] shrink-0">
                 Route {customer.route || "A"}
               </span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F8FAFC] text-[#0077B6] border border-[#0077B6] shrink-0">
+                Empty Bottles: {customer.empty_bottles ?? 0}
+              </span>
             </div>
             <p className="text-xs text-muted-foreground truncate">
               Rs. {customer.price_per_bottle}/bottle

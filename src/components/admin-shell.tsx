@@ -11,6 +11,7 @@ import {
   UserCircle,
   KeyRound,
   X,
+  Clipboard,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
@@ -23,6 +24,7 @@ const nav: { to: string; label: string; icon: LucideIcon }[] = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/lots", label: "Lots & Deliveries", icon: PackageOpen },
   { to: "/admin/customers", label: "Customers", icon: Users },
+  { to: "/admin/records", label: "Add Record", icon: Clipboard },
   { to: "/admin/expenses", label: "Expenses", icon: Receipt },
   { to: "/admin/bills", label: "Bills & Reports", icon: FileText },
   { to: "/admin/notifications", label: "Notifications", icon: Bell },
@@ -31,6 +33,7 @@ const nav: { to: string; label: string; icon: LucideIcon }[] = [
 const mobileNav = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/customers", label: "Customers", icon: Users },
+  { to: "/admin/records", label: "Add Record", icon: Clipboard },
   { to: "/admin/bills", label: "Reports", icon: FileText },
   { to: "/admin/notifications", label: "Notifications", icon: Bell },
   { to: "#profile", label: "Profile", icon: UserCircle },
@@ -65,8 +68,12 @@ export function AdminShell({
     };
     load();
     const ch = supabase
-      .channel("admin-notifs-shell")
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, load)
+      .channel("notifications")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications" },
+        load,
+      )
       .subscribe();
     return () => {
       cancelled = true;
@@ -170,7 +177,7 @@ export function AdminShell({
 
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-9 inset-x-0 z-40 border-t border-border bg-card">
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           {mobileNav.map((t) => {
             const active = t.to === "#profile" ? profileOpen : pathname.startsWith(t.to);
             const Icon = t.icon;

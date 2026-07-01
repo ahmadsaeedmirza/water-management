@@ -16,6 +16,7 @@ import { Route as AuthenticatedWorkerExpensesRouteImport } from './routes/_authe
 import { Route as AuthenticatedWorkerDeliveriesRouteImport } from './routes/_authenticated.worker.deliveries'
 import { Route as AuthenticatedWorkerDashboardRouteImport } from './routes/_authenticated.worker.dashboard'
 import { Route as AuthenticatedWorkerCustomersRouteImport } from './routes/_authenticated.worker.customers'
+import { Route as AuthenticatedAdminRecordsRouteImport } from './routes/_authenticated.admin.records'
 import { Route as AuthenticatedAdminNotificationsRouteImport } from './routes/_authenticated.admin.notifications'
 import { Route as AuthenticatedAdminLotsRouteImport } from './routes/_authenticated.admin.lots'
 import { Route as AuthenticatedAdminExpensesRouteImport } from './routes/_authenticated.admin.expenses'
@@ -59,6 +60,12 @@ const AuthenticatedWorkerCustomersRoute =
   AuthenticatedWorkerCustomersRouteImport.update({
     id: '/worker/customers',
     path: '/worker/customers',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminRecordsRoute =
+  AuthenticatedAdminRecordsRouteImport.update({
+    id: '/admin/records',
+    path: '/admin/records',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedAdminNotificationsRoute =
@@ -105,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/admin/expenses': typeof AuthenticatedAdminExpensesRoute
   '/admin/lots': typeof AuthenticatedAdminLotsRoute
   '/admin/notifications': typeof AuthenticatedAdminNotificationsRoute
+  '/admin/records': typeof AuthenticatedAdminRecordsRoute
   '/worker/customers': typeof AuthenticatedWorkerCustomersRoute
   '/worker/dashboard': typeof AuthenticatedWorkerDashboardRoute
   '/worker/deliveries': typeof AuthenticatedWorkerDeliveriesRoute
@@ -119,6 +127,7 @@ export interface FileRoutesByTo {
   '/admin/expenses': typeof AuthenticatedAdminExpensesRoute
   '/admin/lots': typeof AuthenticatedAdminLotsRoute
   '/admin/notifications': typeof AuthenticatedAdminNotificationsRoute
+  '/admin/records': typeof AuthenticatedAdminRecordsRoute
   '/worker/customers': typeof AuthenticatedWorkerCustomersRoute
   '/worker/dashboard': typeof AuthenticatedWorkerDashboardRoute
   '/worker/deliveries': typeof AuthenticatedWorkerDeliveriesRoute
@@ -135,6 +144,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/expenses': typeof AuthenticatedAdminExpensesRoute
   '/_authenticated/admin/lots': typeof AuthenticatedAdminLotsRoute
   '/_authenticated/admin/notifications': typeof AuthenticatedAdminNotificationsRoute
+  '/_authenticated/admin/records': typeof AuthenticatedAdminRecordsRoute
   '/_authenticated/worker/customers': typeof AuthenticatedWorkerCustomersRoute
   '/_authenticated/worker/dashboard': typeof AuthenticatedWorkerDashboardRoute
   '/_authenticated/worker/deliveries': typeof AuthenticatedWorkerDeliveriesRoute
@@ -151,6 +161,7 @@ export interface FileRouteTypes {
     | '/admin/expenses'
     | '/admin/lots'
     | '/admin/notifications'
+    | '/admin/records'
     | '/worker/customers'
     | '/worker/dashboard'
     | '/worker/deliveries'
@@ -165,6 +176,7 @@ export interface FileRouteTypes {
     | '/admin/expenses'
     | '/admin/lots'
     | '/admin/notifications'
+    | '/admin/records'
     | '/worker/customers'
     | '/worker/dashboard'
     | '/worker/deliveries'
@@ -180,6 +192,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/expenses'
     | '/_authenticated/admin/lots'
     | '/_authenticated/admin/notifications'
+    | '/_authenticated/admin/records'
     | '/_authenticated/worker/customers'
     | '/_authenticated/worker/dashboard'
     | '/_authenticated/worker/deliveries'
@@ -243,6 +256,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWorkerCustomersRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/records': {
+      id: '/_authenticated/admin/records'
+      path: '/admin/records'
+      fullPath: '/admin/records'
+      preLoaderRoute: typeof AuthenticatedAdminRecordsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin/notifications': {
       id: '/_authenticated/admin/notifications'
       path: '/admin/notifications'
@@ -295,6 +315,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminExpensesRoute: typeof AuthenticatedAdminExpensesRoute
   AuthenticatedAdminLotsRoute: typeof AuthenticatedAdminLotsRoute
   AuthenticatedAdminNotificationsRoute: typeof AuthenticatedAdminNotificationsRoute
+  AuthenticatedAdminRecordsRoute: typeof AuthenticatedAdminRecordsRoute
   AuthenticatedWorkerCustomersRoute: typeof AuthenticatedWorkerCustomersRoute
   AuthenticatedWorkerDashboardRoute: typeof AuthenticatedWorkerDashboardRoute
   AuthenticatedWorkerDeliveriesRoute: typeof AuthenticatedWorkerDeliveriesRoute
@@ -308,6 +329,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminExpensesRoute: AuthenticatedAdminExpensesRoute,
   AuthenticatedAdminLotsRoute: AuthenticatedAdminLotsRoute,
   AuthenticatedAdminNotificationsRoute: AuthenticatedAdminNotificationsRoute,
+  AuthenticatedAdminRecordsRoute: AuthenticatedAdminRecordsRoute,
   AuthenticatedWorkerCustomersRoute: AuthenticatedWorkerCustomersRoute,
   AuthenticatedWorkerDashboardRoute: AuthenticatedWorkerDashboardRoute,
   AuthenticatedWorkerDeliveriesRoute: AuthenticatedWorkerDeliveriesRoute,

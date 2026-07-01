@@ -144,35 +144,49 @@ function WorkerDashboard() {
         .select()
         .single();
       if (error) throw error;
-      // notify admins
-      const { data: admins } = await supabase
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "admin");
-      if (admins?.length) {
-        await supabase.from("notifications").insert(
-          admins.map((a) => ({
-            user_id: a.user_id,
-            worker_id: user!.id,
-            kind: "lot",
-            message: `Worker started a new lot of ${n} bottles`,
-            is_read: false,
-            created_at: new Date().toISOString(),
-          })),
-        );
-        try {
-          const { notifyAdminsPush } = await import("@/lib/push-server");
-          await notifyAdminsPush({
-            data: {
-              title: "New Lot Started 📦",
-              body: `Worker started a new lot of ${n} bottles`,
-              url: "/admin/lots",
-            },
-          });
-        } catch (pushErr) {
-          console.error("Failed to send push notification:", pushErr);
-        }
+
+      console.log("LOT CREATED - starting notification flow");
+
+      const totalBottles = n;
+      const currentUser = user!;
+
+      const { error: notifError } = await supabase
+        .from("notifications")
+        .insert({
+          message: `Worker started a new lot of ${totalBottles} bottles`,
+          worker_id: currentUser.id,
+          is_read: false,
+          created_at: new Date().toISOString(),
+          kind: "lot",
+        });
+
+      if (notifError) {
+        console.error("NOTIFICATION INSERT FAILED:", notifError);
+      } else {
+        console.log("NOTIFICATION INSERT SUCCESS");
       }
+
+      const broadcastPushToAdmins = async (message: string) => {
+        const { notifyAdminsPush } = await import("@/lib/push-server");
+        const res = await notifyAdminsPush({
+          data: {
+            title: "New Lot Started 📦",
+            body: message,
+            url: "/admin/lots",
+          },
+        });
+        if (!res.success) {
+          throw new Error(res.error || "Push failed");
+        }
+      };
+
+      try {
+        await broadcastPushToAdmins(`Worker started a new lot of ${totalBottles} bottles`);
+        console.log("PUSH BROADCAST SUCCESS");
+      } catch (err) {
+        console.error("PUSH BROADCAST FAILED:", err);
+      }
+
       return data;
     },
     onSuccess: () => {

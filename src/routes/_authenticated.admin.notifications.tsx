@@ -73,9 +73,23 @@ function AdminNotifications() {
 
   useEffect(() => {
     const ch = supabase
-      .channel("adm-notifs-page")
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () =>
-        qc.invalidateQueries({ queryKey: ["adm-notifs"] }),
+      .channel("notifications")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+        },
+        (payload) => {
+          // add new notification to state
+          qc.setQueryData(["adm-notifs"], (old: any) => {
+            if (!old) return [payload.new];
+            if (old.some((n: any) => n.id === payload.new.id)) return old;
+            return [payload.new, ...old];
+          });
+          qc.invalidateQueries({ queryKey: ["adm-notifs"] });
+        },
       )
       .subscribe();
     return () => {
