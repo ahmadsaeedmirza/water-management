@@ -119,7 +119,7 @@ function AdminDashboard() {
         .from("customers")
         .select(
           `
-          id, name, address, phone, price_per_bottle,
+          id, name, address, phone, price_per_bottle, route,
           deliveries(bottles_delivered, total_amount, payment_mode, created_at),
           payments(amount, created_at)
         `,
@@ -879,7 +879,12 @@ function LedgerDrawer({ customer, onClose }: { customer: any; onClose: () => voi
             {initials(customer.name)}
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="font-bold truncate">{customer.name}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-bold truncate">{customer.name}</h2>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F8FAFC] text-[#0077B6] border border-[#0077B6] shrink-0">
+                Route {customer.route || "A"}
+              </span>
+            </div>
             <p className="text-xs text-muted-foreground truncate">
               Rs. {customer.price_per_bottle}/bottle
             </p>

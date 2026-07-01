@@ -17,6 +17,7 @@ function AdminCustomers() {
   const [q, setQ] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [routeFilter, setRouteFilter] = useState<"All" | "A" | "B">("All");
 
   const customersQ = useQuery({
     queryKey: ["adm-customers"],
@@ -51,10 +52,12 @@ function AdminCustomers() {
   }, [qc]);
 
   const customers = customersQ.data ?? [];
-  const filtered = useMemo(
-    () => customers.filter((c: any) => c.name.toLowerCase().includes(q.toLowerCase())),
-    [customers, q],
-  );
+  const filtered = useMemo(() => {
+    return customers.filter((c: any) => {
+      if (routeFilter !== "All" && c.route !== routeFilter) return false;
+      return c.name.toLowerCase().includes(q.toLowerCase());
+    });
+  }, [customers, q, routeFilter]);
   const opened = customers.find((c: any) => c.id === openId);
 
   const totalDues = customers.reduce((sum: number, c: any) => {
@@ -92,6 +95,23 @@ function AdminCustomers() {
         />
       </div>
 
+      <div className="flex gap-2 mb-4">
+        {(["All", "A", "B"] as const).map((r) => (
+          <button
+            key={r}
+            type="button"
+            onClick={() => setRouteFilter(r)}
+            className={`px-4 h-9 rounded-full text-xs font-semibold border transition-all ${
+              routeFilter === r
+                ? "bg-[#0077B6] text-white border-[#0077B6]"
+                : "bg-card text-muted-foreground border-border hover:bg-muted"
+            }`}
+          >
+            {r === "All" ? "All Routes" : `Route ${r}`}
+          </button>
+        ))}
+      </div>
+
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 px-6 text-center bg-card rounded-xl border border-border space-y-3">
           <Users className="h-12 w-12 text-[#90E0EF]" />
@@ -123,7 +143,12 @@ function AdminCustomers() {
                     {initials(c.name)}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold text-sm truncate">{c.name}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-bold text-sm truncate">{c.name}</p>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F8FAFC] text-[#0077B6] border border-[#0077B6] shrink-0">
+                        Route {c.route || "A"}
+                      </span>
+                    </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {c.phone || "No phone"}
                     </p>
@@ -242,7 +267,12 @@ function LedgerDrawer({ customer, onClose }: { customer: any; onClose: () => voi
             {initials(customer.name)}
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="font-bold truncate">{customer.name}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-bold truncate">{customer.name}</h2>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F8FAFC] text-[#0077B6] border border-[#0077B6] shrink-0">
+                Route {customer.route || "A"}
+              </span>
+            </div>
             <p className="text-xs text-muted-foreground truncate">
               Rs. {customer.price_per_bottle}/bottle
             </p>
@@ -443,6 +473,7 @@ function AddCustomerDrawer({ onClose, onAdded }: { onClose: () => void; onAdded:
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [price, setPrice] = useState("25");
+  const [route, setRoute] = useState<"A" | "B">("A");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const m = useMutation({
@@ -452,6 +483,7 @@ function AddCustomerDrawer({ onClose, onAdded }: { onClose: () => void; onAdded:
         phone: phone.trim() || null,
         address: address.trim(),
         price_per_bottle: parseFloat(price) || 0,
+        route,
       });
       if (error) throw error;
     },
@@ -522,6 +554,33 @@ function AddCustomerDrawer({ onClose, onAdded }: { onClose: () => void; onAdded:
             }}
             className="input"
           />
+        </Field>
+
+        <Field label="Delivery Route">
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setRoute("A")}
+              className={`flex-1 h-11 rounded-[10px] text-sm font-semibold border transition-all ${
+                route === "A"
+                  ? "bg-[#0077B6] text-white border-[#0077B6]"
+                  : "bg-transparent text-muted-foreground border-border"
+              }`}
+            >
+              Route A
+            </button>
+            <button
+              type="button"
+              onClick={() => setRoute("B")}
+              className={`flex-1 h-11 rounded-[10px] text-sm font-semibold border transition-all ${
+                route === "B"
+                  ? "bg-[#0077B6] text-white border-[#0077B6]"
+                  : "bg-transparent text-muted-foreground border-border"
+              }`}
+            >
+              Route B
+            </button>
+          </div>
         </Field>
 
         <Field label="Price per bottle" error={errors.price}>

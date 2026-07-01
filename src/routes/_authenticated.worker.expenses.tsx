@@ -176,15 +176,21 @@ function ExpensesPage() {
                 <label className="text-xs font-bold tracking-wider text-muted-foreground">
                   EXPENSE NAME
                 </label>
-                <input
+                <select
                   value={eName}
                   onChange={(e) => {
                     setEName(e.target.value);
                     setErrors((errs) => ({ ...errs, name: "" }));
                   }}
-                  placeholder="e.g. Fuel"
                   className="mt-2 h-12 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/15"
-                />
+                >
+                  <option value="">Select expense type</option>
+                  <option value="Option A">Option A</option>
+                  <option value="Option B">Option B</option>
+                  <option value="Option C">Option C</option>
+                  <option value="Option D">Option D</option>
+                  <option value="Option E">Option E</option>
+                </select>
                 {errors.name && (
                   <p className="text-xs text-destructive mt-1 font-semibold">{errors.name}</p>
                 )}

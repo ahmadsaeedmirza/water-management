@@ -16,6 +16,7 @@ export type Database = {
           name: string;
           phone: string | null;
           price_per_bottle: number;
+          route: "A" | "B";
         };
         Insert: {
           address?: string;
@@ -24,6 +25,7 @@ export type Database = {
           name: string;
           phone?: string | null;
           price_per_bottle?: number;
+          route?: "A" | "B";
         };
         Update: {
           address?: string;
@@ -32,6 +34,7 @@ export type Database = {
           name?: string;
           phone?: string | null;
           price_per_bottle?: number;
+          route?: "A" | "B";
         };
         Relationships: [];
       };
