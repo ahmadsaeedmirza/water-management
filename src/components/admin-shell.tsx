@@ -67,8 +67,8 @@ export function AdminShell({
       if (!cancelled) setUnread(count ?? 0);
     };
     load();
-    const ch = supabase
-      .channel("notifications")
+    const channel = supabase
+      .channel("admin-shell-notifications")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "notifications" },
@@ -77,7 +77,7 @@ export function AdminShell({
       .subscribe();
     return () => {
       cancelled = true;
-      supabase.removeChannel(ch);
+      supabase.removeChannel(channel);
     };
   }, [user]);
 

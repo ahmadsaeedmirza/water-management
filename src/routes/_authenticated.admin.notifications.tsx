@@ -72,8 +72,8 @@ function AdminNotifications() {
   });
 
   useEffect(() => {
-    const ch = supabase
-      .channel("notifications")
+    const channel = supabase
+      .channel("notifications-feed")
       .on(
         "postgres_changes",
         {
@@ -92,10 +92,11 @@ function AdminNotifications() {
         },
       )
       .subscribe();
+
     return () => {
-      supabase.removeChannel(ch);
+      supabase.removeChannel(channel);
     };
-  }, [qc]);
+  }, []);
 
   const markAll = useMutation({
     mutationFn: async () => {
