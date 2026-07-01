@@ -160,7 +160,7 @@ export function AdminShell({
           <div className="px-4 md:px-8 py-6 pb-20 md:pb-6">{children}</div>
         </div>
 
-        <footer className="w-full h-9 bg-[#0F172A] flex items-center justify-center text-xs text-[#64748B] text-center shrink-0 md:relative fixed bottom-0 left-0 right-0 z-50">
+        <footer className="w-full h-9 flex items-center justify-center text-xs text-[#64748B] text-center shrink-0 md:relative fixed bottom-0 left-0 right-0 z-50">
           <span>
             © Shifaf Aab · Powered by{" "}
             <a
@@ -310,7 +310,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const handleUpdate = async () => {
     setError("");
     setSuccess("");
-    
+
     if (!currentPassword) {
       setError("Current password is required");
       return;
