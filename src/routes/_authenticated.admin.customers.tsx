@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { AdminShell } from "@/components/admin-shell";
 import { formatRs, formatDate, formatTime, initials } from "@/lib/format";
-import { Search, Plus, X, Banknote, CreditCard, Globe, Phone, MapPin, Users, Truck } from "lucide-react";
+import { Search, Plus, X, Banknote, CreditCard, Globe, Phone, MapPin, Users, Truck, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin/customers")({
@@ -18,6 +18,20 @@ function AdminCustomers() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [routeFilter, setRouteFilter] = useState<"All" | "A" | "B">("All");
+  const [editingCustomer, setEditingCustomer] = useState<any>(null);
+  const [deletingCustomer, setDeletingCustomer] = useState<any>(null);
+
+  const deleteCustomer = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("customers").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Customer deleted");
+      qc.invalidateQueries({ queryKey: ["adm-customers"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   const customersQ = useQuery({
     queryKey: ["adm-customers"],
@@ -133,13 +147,15 @@ function AdminCustomers() {
               0,
             );
             return (
-              <button
+              <div
                 key={c.id}
-                onClick={() => setOpenId(c.id)}
-                className="card-surface p-4 text-left hover:border-primary/40 transition-colors"
+                className="card-surface p-4 flex flex-col justify-between hover:border-primary/40 transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <div className="h-11 w-11 rounded-full bg-accent grid place-items-center text-primary font-bold text-sm">
+                <div
+                  className="flex items-center gap-3 cursor-pointer"
+                  onClick={() => setOpenId(c.id)}
+                >
+                  <div className="h-11 w-11 rounded-full bg-accent grid place-items-center text-primary font-bold text-sm shrink-0">
                     {initials(c.name)}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -161,13 +177,13 @@ function AdminCustomers() {
                   </div>
                 </div>
                 <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
-                  <div>
+                  <div className="cursor-pointer flex-1" onClick={() => setOpenId(c.id)}>
                     <p className="text-[11px] text-muted-foreground uppercase font-semibold">
                       Bottles
                     </p>
                     <p className="font-bold tabular-nums">{bottles}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="cursor-pointer flex-1 text-center" onClick={() => setOpenId(c.id)}>
                     <p className="text-[11px] text-muted-foreground uppercase font-semibold">
                       Dues
                     </p>
@@ -177,8 +193,24 @@ function AdminCustomers() {
                       {dues < 0 ? "Overpaid" : dues === 0 ? "Rs. 0" : formatRs(dues)}
                     </p>
                   </div>
+                  <div className="flex items-center gap-1.5 pl-2">
+                    <button
+                      onClick={() => setEditingCustomer(c)}
+                      className="h-8 w-8 rounded-lg border border-border bg-card text-[#64748B] hover:bg-muted hover:text-primary grid place-items-center transition-colors"
+                      title="Edit Customer"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setDeletingCustomer(c)}
+                      className="h-8 w-8 rounded-lg border border-[#E63946] bg-card text-[#E63946] hover:bg-[#E63946]/10 grid place-items-center transition-colors"
+                      title="Delete Customer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -190,6 +222,40 @@ function AdminCustomers() {
           onClose={() => setAdding(false)}
           onAdded={() => qc.invalidateQueries({ queryKey: ["adm-customers"] })}
         />
+      )}
+      {editingCustomer && (
+        <AddCustomerDrawer
+          customer={editingCustomer}
+          onClose={() => setEditingCustomer(null)}
+          onAdded={() => qc.invalidateQueries({ queryKey: ["adm-customers"] })}
+        />
+      )}
+      {deletingCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-card w-full max-w-sm rounded-xl p-5 border border-border space-y-4 shadow-lg animate-in fade-in zoom-in-95 duration-150">
+            <h3 className="font-bold text-base text-destructive">Delete Customer</h3>
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete {deletingCustomer.name}? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2.5">
+              <button
+                onClick={() => setDeletingCustomer(null)}
+                className="h-9 px-4 rounded-lg border border-border text-xs font-semibold hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  deleteCustomer.mutate(deletingCustomer.id);
+                  setDeletingCustomer(null);
+                }}
+                className="h-9 px-4 rounded-lg bg-destructive text-destructive-foreground text-xs font-semibold hover:opacity-95"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </AdminShell>
   );
@@ -468,27 +534,49 @@ function Stat({
   );
 }
 
-function AddCustomerDrawer({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [price, setPrice] = useState("25");
-  const [route, setRoute] = useState<"A" | "B">("A");
+function AddCustomerDrawer({
+  customer,
+  onClose,
+  onAdded,
+}: {
+  customer?: any;
+  onClose: () => void;
+  onAdded: () => void;
+}) {
+  const [name, setName] = useState(customer?.name ?? "");
+  const [phone, setPhone] = useState(customer?.phone ?? "");
+  const [address, setAddress] = useState(customer?.address ?? "");
+  const [price, setPrice] = useState(customer ? String(customer.price_per_bottle) : "25");
+  const [route, setRoute] = useState<"A" | "B">(customer?.route ?? "A");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("customers").insert({
-        name: name.trim(),
-        phone: phone.trim() || null,
-        address: address.trim(),
-        price_per_bottle: parseFloat(price) || 0,
-        route,
-      });
-      if (error) throw error;
+      if (customer) {
+        const { error } = await supabase
+          .from("customers")
+          .update({
+            name: name.trim(),
+            phone: phone.trim() || null,
+            address: address.trim(),
+            price_per_bottle: parseFloat(price) || 0,
+            route,
+          })
+          .eq("id", customer.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("customers").insert({
+          name: name.trim(),
+          phone: phone.trim() || null,
+          address: address.trim(),
+          price_per_bottle: parseFloat(price) || 0,
+          route,
+        });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
-      toast.success("Customer added");
+      toast.success(customer ? "Customer updated successfully" : "Customer added");
       onAdded();
       onClose();
     },
@@ -527,7 +615,7 @@ function AddCustomerDrawer({ onClose, onAdded }: { onClose: () => void; onAdded:
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sm:hidden mx-auto h-1.5 w-12 rounded-full bg-muted" />
-        <h3 className="font-bold text-lg">Add Customer</h3>
+        <h3 className="font-bold text-lg">{customer ? "Edit Customer" : "Add Customer"}</h3>
 
         <Field label="Name" error={errors.name}>
           <input
@@ -600,7 +688,7 @@ function AddCustomerDrawer({ onClose, onAdded }: { onClose: () => void; onAdded:
           disabled={m.isPending}
           className="w-full h-12 rounded-[10px] bg-primary text-primary-foreground font-bold disabled:opacity-50 transition-opacity"
         >
-          {m.isPending ? "Saving…" : "Add Customer"}
+          {m.isPending ? "Saving…" : customer ? "Save Changes" : "Add Customer"}
         </button>
       </div>
       <style>{`.input{height:44px;width:100%;padding:0 14px;border-radius:10px;border:1px solid var(--color-border);background:var(--color-background);font-size:14px;outline:none}.input:focus{box-shadow:0 0 0 2px var(--color-ring)}`}</style>

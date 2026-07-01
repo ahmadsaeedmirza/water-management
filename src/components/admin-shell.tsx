@@ -135,25 +135,41 @@ export function AdminShell({
   );
 
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row pb-16 md:pb-0">
+    <div className="min-h-screen bg-background flex flex-col md:flex-row pb-24 md:pb-0">
       <div className="hidden md:flex sticky top-0 h-screen">{Sidebar}</div>
-      <main className="flex-1 min-w-0">
-        <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border px-4 md:px-8 py-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="min-w-0">
-                <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate">{title}</h1>
-                {subtitle && <p className="text-sm text-muted-foreground truncate">{subtitle}</p>}
+      <main className="flex-1 min-w-0 flex flex-col justify-between min-h-screen">
+        <div className="flex-1">
+          <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border px-4 md:px-8 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="min-w-0">
+                  <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate">{title}</h1>
+                  {subtitle && <p className="text-sm text-muted-foreground truncate">{subtitle}</p>}
+                </div>
               </div>
+              {right}
             </div>
-            {right}
-          </div>
-        </header>
-        <div className="px-4 md:px-8 py-6 pb-20 md:pb-6">{children}</div>
+          </header>
+          <div className="px-4 md:px-8 py-6 pb-20 md:pb-6">{children}</div>
+        </div>
+
+        <footer className="w-full h-9 bg-[#0F172A] flex items-center justify-center text-xs text-[#64748B] text-center shrink-0 md:relative fixed bottom-0 left-0 right-0 z-50">
+          <span>
+            © Shifaf Aab · Powered by{" "}
+            <a
+              href="https://www.devitytechnologies.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#00B4D8] hover:underline"
+            >
+              Devity Technologies
+            </a>
+          </span>
+        </footer>
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card">
+      <nav className="md:hidden fixed bottom-9 inset-x-0 z-40 border-t border-border bg-card">
         <div className="grid grid-cols-5">
           {mobileNav.map((t) => {
             const active = t.to === "#profile" ? profileOpen : pathname.startsWith(t.to);

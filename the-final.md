@@ -84,6 +84,11 @@ The following updates were recently integrated and verified to compile with zero
 | **Worker Ledger** | **Customer payment & ledger logs** | Opened Ledger Drawer permissions to workers. Workers can now toggle ledger tabs, view dues, and record customer payments (Cash, Card, Online). |
 | **Delivery Routes** | **Route A / B segmentation** | Added `route` check constraint column to customers. Added route filters, card badges, and ledger header route tags to both Worker and Admin views. |
 | **Authentication** | **Registration Disabled** | Removed frontend "Create Account" sign-up links. Users must get credentials directly from the administration. |
+| **Edit/Delete Customers** | **Profile Edits (Admin Only)** | Enabled admin-only profile editing via pre-filled AddCustomerDrawer. Added a trash-can delete icon button with a confirmation popup modal. |
+| **Notification Deletions** | **Individual & Clear All** | Added individual row deletions (with confirmation) and a page-wide "Clear All" button to delete all notifications for the current admin. |
+| **Notification Cleanup** | **48h Auto-Delete** | Created Supabase migration `20260701000001_auto_delete_old_notifications.sql` with a pg_cron hourly job. Implemented login useEffect cleanup query fallback. |
+| **Sticky Footer** | **Powered by Devity** | Rendered brand footer center-aligned. Shifted mobile nav layout by 36px (`bottom-9`) and fixed footer at `bottom-0` to avoid overlaps. |
+| **Worker Lots Notification** | **Lot Creation Alerts Fix** | Fixed worker lot mutation notification inserting with correct kind `lot`, standard message, and proper `await` on the push broadcast. |
 
 ---
 

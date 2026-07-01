@@ -154,19 +154,24 @@ function WorkerDashboard() {
           admins.map((a) => ({
             user_id: a.user_id,
             worker_id: user!.id,
-            kind: "lot_started",
-            message: `${name || "Worker"} started a new lot of ${n} bottles`,
+            kind: "lot",
+            message: `Worker started a new lot of ${n} bottles`,
+            is_read: false,
+            created_at: new Date().toISOString(),
           })),
         );
-        import("@/lib/push-server").then(({ notifyAdminsPush }) => {
-          notifyAdminsPush({
+        try {
+          const { notifyAdminsPush } = await import("@/lib/push-server");
+          await notifyAdminsPush({
             data: {
               title: "New Lot Started 📦",
-              body: `${name || "Worker"} started a new lot of ${n} bottles`,
+              body: `Worker started a new lot of ${n} bottles`,
               url: "/admin/lots",
             },
           });
-        });
+        } catch (pushErr) {
+          console.error("Failed to send push notification:", pushErr);
+        }
       }
       return data;
     },

@@ -59,6 +59,22 @@ function AdminDashboard() {
   const qc = useQueryClient();
   const since = startOf(range);
 
+  useEffect(() => {
+    const cleanupOldNotifications = async () => {
+      try {
+        const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+        const { error } = await supabase
+          .from("notifications")
+          .delete()
+          .lt("created_at", fortyEightHoursAgo);
+        if (error) throw error;
+      } catch (err) {
+        console.error("Failed to auto-delete old notifications:", err);
+      }
+    };
+    cleanupOldNotifications();
+  }, []);
+
   const deliveriesQ = useQuery({
     queryKey: ["adm-deliveries", range],
     queryFn: async () => {
