@@ -83,6 +83,7 @@ The following updates were recently integrated and verified to compile with zero
 | **Worker Expenses** | **Predefined dropdown selector** | Replaced the free-text name field with a styled select box featuring options **Option A** through **Option E**. |
 | **Worker Ledger** | **Customer payment & ledger logs** | Opened Ledger Drawer permissions to workers. Workers can now toggle ledger tabs, view dues, and record customer payments (Cash, Card, Online). |
 | **Delivery Routes** | **Route A / B segmentation** | Added `route` check constraint column to customers. Added route filters, card badges, and ledger header route tags to both Worker and Admin views. |
+| **Authentication** | **Registration Disabled** | Removed frontend "Create Account" sign-up links. Users must get credentials directly from the administration. |
 
 ---
 

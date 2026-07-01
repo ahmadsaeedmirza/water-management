@@ -137,21 +137,7 @@ function AuthPage() {
         </form>
 
         <div className="mt-6 border-t border-border pt-5 text-center text-sm text-muted-foreground">
-          {mode === "signin" ? (
-            <>
-              Need access?{" "}
-              <button onClick={() => setMode("signup")} className="font-semibold text-primary">
-                Create Account
-              </button>
-            </>
-          ) : (
-            <>
-              Already have an account?{" "}
-              <button onClick={() => setMode("signin")} className="font-semibold text-primary">
-                Sign In
-              </button>
-            </>
-          )}
+          Please contact administration if you need credentials.
         </div>
       </div>
     </div>
