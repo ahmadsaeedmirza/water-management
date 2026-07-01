@@ -185,11 +185,11 @@ function ExpensesPage() {
                   className="mt-2 h-12 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/15"
                 >
                   <option value="">Select expense type</option>
-                  <option value="Option A">Option A</option>
-                  <option value="Option B">Option B</option>
-                  <option value="Option C">Option C</option>
-                  <option value="Option D">Option D</option>
-                  <option value="Option E">Option E</option>
+                  <option value="Tea (چائے)">Tea (چائے)</option>
+                  <option value="Lunch (کھانا)">Lunch (کھانا)</option>
+                  <option value="Juice/Bottle (جوس/بوتل)">Juice/Bottle (جوس/بوتل)</option>
+                  <option value="Fuel (پیٹرول)">Fuel (پیٹرول)</option>
+                  <option value="Payment to Sir (جناب کو ادائیگی)">Payment to Sir (جناب کو ادائیگی)</option>
                 </select>
                 {errors.name && (
                   <p className="text-xs text-destructive mt-1 font-semibold">{errors.name}</p>
