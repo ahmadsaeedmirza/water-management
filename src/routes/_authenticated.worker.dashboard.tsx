@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Droplet, Bell, Plus, Truck, Receipt, Settings } from "lucide-react";
+import { Droplet, Bell, Plus, Truck, Receipt, User, LogOut } from "lucide-react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,7 +27,7 @@ function WorkerDashboard() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [bottles, setBottles] = useState("");
   const [notifOpen, setNotifOpen] = useState(false);
-  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const today = startOfToday();
 
@@ -46,17 +46,51 @@ function WorkerDashboard() {
     },
   });
 
-  const expensesQ = useQuery({
-    queryKey: ["expenses-today", user?.id, today],
-    enabled: !!user,
+  const globalDeliveriesQ = useQuery({
+    queryKey: ["global-deliveries-today", today],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("deliveries")
+        .select("bottles_delivered, total_amount, payment_mode, customer_type")
+        .gte("created_at", today);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const globalPaymentsQ = useQuery({
+    queryKey: ["global-payments-today", today],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("payments")
+        .select("amount")
+        .gte("created_at", today);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const globalExpensesQ = useQuery({
+    queryKey: ["global-expenses-today", today],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("expenses")
         .select("amount")
-        .eq("worker_id", user!.id)
         .gte("created_at", today);
       if (error) throw error;
-      return data;
+      return data ?? [];
+    },
+  });
+
+  const globalLotsQ = useQuery({
+    queryKey: ["global-lots-today", today],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lots")
+        .select("status")
+        .gte("created_at", today);
+      if (error) throw error;
+      return data ?? [];
     },
   });
 
@@ -95,16 +129,32 @@ function WorkerDashboard() {
       .channel("worker-dashboard")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "deliveries", filter: `worker_id=eq.${user.id}` },
+        { event: "*", schema: "public", table: "deliveries" },
         () => {
           qc.invalidateQueries({ queryKey: ["lots"] });
+          qc.invalidateQueries({ queryKey: ["global-deliveries-today"] });
         },
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "lots", filter: `worker_id=eq.${user.id}` },
+        { event: "*", schema: "public", table: "lots" },
         () => {
           qc.invalidateQueries({ queryKey: ["lots"] });
+          qc.invalidateQueries({ queryKey: ["global-lots-today"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payments" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["global-payments-today"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "expenses" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["global-expenses-today"] });
         },
       )
       .on(
@@ -121,18 +171,23 @@ function WorkerDashboard() {
   }, [user, qc]);
 
   const lots = lotsQ.data ?? [];
-  const totalBottlesSold = lots.reduce(
-    (s, l: any) =>
-      s + (l.deliveries?.reduce((a: number, d: any) => a + d.bottles_delivered, 0) ?? 0),
-    0,
-  );
-  const totalRevenue = lots.reduce(
-    (s, l: any) =>
-      s + (l.deliveries?.filter((d: any) => d.payment_mode !== "pending").reduce((a: number, d: any) => a + Number(d.total_amount), 0) ?? 0),
-    0,
-  );
-  const activeLots = lots.filter((l: any) => l.status === "active").length;
-  const totalExpenses = (expensesQ.data ?? []).reduce((s, e: any) => s + Number(e.amount), 0);
+  const deliveries = globalDeliveriesQ.data ?? [];
+  const payments = globalPaymentsQ.data ?? [];
+  const expenses = globalExpensesQ.data ?? [];
+  const globalLots = globalLotsQ.data ?? [];
+
+  const totalBottlesSold = deliveries.reduce((s, d: any) => s + d.bottles_delivered, 0);
+
+  const walkinRev = deliveries
+    .filter((d: any) => d.customer_type === "walkin" && d.payment_mode !== "pending")
+    .reduce((s, d: any) => s + Number(d.total_amount), 0);
+
+  const regularCollected = payments.reduce((s, p: any) => s + Number(p.amount), 0);
+
+  const totalRevenue = walkinRev + regularCollected;
+  const activeLots = globalLots.filter((l: any) => l.status === "active").length;
+  const totalExpenses = expenses.reduce((s, e: any) => s + Number(e.amount), 0);
+
   const notifications = notificationsQ.data ?? [];
   const hasUnreadNotifs = notifications.some((n: any) => !n.is_read);
 
@@ -209,10 +264,10 @@ function WorkerDashboard() {
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setPasswordOpen(true)}
+            onClick={() => setProfileOpen(true)}
             className="h-10 w-10 grid place-items-center rounded-full text-muted-foreground hover:bg-muted"
           >
-            <Settings className="h-5 w-5" />
+            <User className="h-5 w-5" />
           </button>
           <button
             onClick={() => {
@@ -381,12 +436,17 @@ function WorkerDashboard() {
         />
       )}
 
-      {passwordOpen && <ChangePasswordSheet onClose={() => setPasswordOpen(false)} />}
+      {profileOpen && <ProfileSheet onClose={() => setProfileOpen(false)} />}
     </WorkerShell>
   );
 }
 
-function ChangePasswordSheet({ onClose }: { onClose: () => void }) {
+function ProfileSheet({ onClose }: { onClose: () => void }) {
+  const { user, name, signOut } = useAuth();
+  const navigate = useNavigate();
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+
+  // Password change states
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -397,7 +457,7 @@ function ChangePasswordSheet({ onClose }: { onClose: () => void }) {
   const handleUpdate = async () => {
     setError("");
     setSuccess("");
-    
+
     if (!currentPassword) {
       setError("Current password is required");
       return;
@@ -429,66 +489,121 @@ function ChangePasswordSheet({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate({ to: "/auth", replace: true });
+      toast.success("Signed out successfully");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to sign out");
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="absolute inset-x-0 bottom-0 bg-card rounded-t-[20px] mx-auto max-w-[390px] p-6 animate-in slide-in-from-bottom duration-200 space-y-4">
+        {/* Drag handle */}
         <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-border" />
-        <h2 className="text-xl font-bold text-center">Change Password</h2>
-        <p className="text-xs text-muted-foreground text-center">
-          Update your account security password.
-        </p>
 
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground">Current Password</label>
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full h-11 px-3 mt-1 rounded-[10px] border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              placeholder="Your current password"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground">New Password</label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full h-11 px-3 mt-1 rounded-[10px] border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              placeholder="Min. 8 characters"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground">
-              Confirm New Password
-            </label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full h-11 px-3 mt-1 rounded-[10px] border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              placeholder="Confirm new password"
-            />
-            {error && <p className="text-xs text-destructive mt-1.5 font-semibold">{error}</p>}
-            {success && <p className="text-xs text-success mt-1.5 font-semibold">{success}</p>}
-          </div>
-        </div>
+        {!showPasswordChange ? (
+          <>
+            <div className="text-center space-y-1">
+              <h2 className="text-xl font-bold">{name || "Worker"}</h2>
+              <p className="text-sm font-medium text-[#64748B]">{user?.email}</p>
+            </div>
 
-        <button
-          onClick={handleUpdate}
-          disabled={loading}
-          className="h-12 w-full rounded-[10px] bg-primary text-primary-foreground font-semibold disabled:opacity-50"
-        >
-          {loading ? "Updating..." : "Update Password"}
-        </button>
-        <button
-          onClick={onClose}
-          className="w-full text-center text-xs font-semibold text-muted-foreground py-2"
-        >
-          Cancel
-        </button>
+            <div className="pt-2 space-y-3">
+              <button
+                onClick={() => setShowPasswordChange(true)}
+                className="h-12 w-full rounded-[10px] bg-secondary text-secondary-foreground font-semibold shadow-sm hover:bg-secondary/80 flex items-center justify-center gap-2"
+              >
+                Change Password
+              </button>
+
+              <button
+                onClick={handleSignOut}
+                className="h-12 w-full rounded-[10px] bg-[#E63946] text-white font-semibold shadow-sm hover:bg-[#E63946]/90 flex items-center justify-center gap-2"
+              >
+                <LogOut className="h-5 w-5" />
+                Sign Out
+              </button>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="w-full text-center text-xs font-semibold text-muted-foreground py-2"
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            <h2 className="text-xl font-bold text-center">Change Password</h2>
+            <p className="text-xs text-muted-foreground text-center">
+              Update your account security password.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground">Current Password</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full h-11 px-3 mt-1 rounded-[10px] border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="Your current password"
+                  autoComplete="current-password"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full h-11 px-3 mt-1 rounded-[10px] border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="Min. 8 characters"
+                  autoComplete="new-password"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground">
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full h-11 px-3 mt-1 rounded-[10px] border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="Confirm new password"
+                  autoComplete="new-password"
+                />
+                {error && <p className="text-xs text-destructive mt-1.5 font-semibold">{error}</p>}
+                {success && <p className="text-xs text-success mt-1.5 font-semibold">{success}</p>}
+              </div>
+            </div>
+
+            <button
+              onClick={handleUpdate}
+              disabled={loading}
+              className="h-12 w-full rounded-[10px] bg-primary text-primary-foreground font-semibold disabled:opacity-50"
+            >
+              {loading ? "Updating..." : "Update Password"}
+            </button>
+
+            <button
+              onClick={() => {
+                setShowPasswordChange(false);
+                setError("");
+                setSuccess("");
+              }}
+              className="w-full text-center text-xs font-semibold text-muted-foreground py-2 hover:underline"
+            >
+              Back to Profile
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
